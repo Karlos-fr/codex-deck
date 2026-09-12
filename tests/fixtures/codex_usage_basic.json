@@ -1,0 +1,16 @@
+{
+  "account_id": "account-fixture-basic",
+  "plan_type": "free",
+  "rate_limit": {
+    "primary_window": {
+      "used_percent": 12,
+      "limit_window_seconds": 18000,
+      "reset_at": 1786701600
+    },
+    "secondary_window": {
+      "used_percent": 34,
+      "limit_window_seconds": 604800,
+      "reset_at": 1787212800
+    }
+  }
+}

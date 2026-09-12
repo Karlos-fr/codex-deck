@@ -1,0 +1,58 @@
+# Build outputs
+build/
+build-release/
+build-asan*/
+out/
+cmake-build-*/
+_codex_archive/
+build-baseline/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# Visual Studio
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+x64/
+x86/
+Debug/
+Release/
+RelWithDebInfo/
+MinSizeRel/
+
+# Binaries
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.obj
+*.res
+
+# Local/editor files
+.vscode/
+.idea/
+*.user
+*.suo
+*.tmp
+*.log
+
+# Local planning notes
+ChatGPT.md
+PLAN.md
+TODO.md
+PLAN_DECOUPAGE_MAIN.md
+RELEASE_NOTES_LOCAL.md
+
+# App local data
+CodexGlass.db
+CodexGlass.db-journal
+settings.ini
+settings.json
+PLAN_EXTRACTION_NATIVE_WIN32_GLASS_KIT.md

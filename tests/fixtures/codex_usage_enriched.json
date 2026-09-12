@@ -1,0 +1,45 @@
+{
+  "account_id": "account-fixture-enriched",
+  "plan_type": "pro",
+  "rate_limit": {
+    "primary_window": {
+      "used_percent": 27,
+      "limit_window_seconds": 18000,
+      "reset_at": 1786701600
+    },
+    "secondary_window": {
+      "used_percent": 41,
+      "limit_window_seconds": 604800,
+      "reset_at": 1787212800
+    },
+    "individual_limit": {
+      "limit": 100,
+      "used": 18.5,
+      "remaining_percent": 81.5,
+      "reset_at": 1788134400
+    }
+  },
+  "credits": {
+    "has_credits": true,
+    "unlimited": false,
+    "balance": "42.75"
+  },
+  "additional_rate_limits": [
+    {
+      "limit_name": "Codex Spark",
+      "metered_feature": "codex-spark",
+      "rate_limit": {
+        "primary_window": {
+          "used_percent": 9,
+          "limit_window_seconds": 18000,
+          "reset_at": 1786705200
+        },
+        "secondary_window": {
+          "used_percent": 22,
+          "limit_window_seconds": 604800,
+          "reset_at": 1787216400
+        }
+      }
+    }
+  ]
+}

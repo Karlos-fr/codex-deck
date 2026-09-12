@@ -1,0 +1,40 @@
+{
+  "plan_type": "future_plan",
+  "rate_limit": {
+    "primary_window": {
+      "used_percent": 8.5,
+      "limit_window_seconds": 18000,
+      "reset_at": 1786701600
+    },
+    "secondary_window": null
+  },
+  "credits": {
+    "has_credits": true,
+    "unlimited": true,
+    "balance": null
+  },
+  "spend_control": {
+    "individual_limit": {
+      "limit": "250",
+      "used": "25.5",
+      "remaining_percent": "89.8",
+      "resets_at": "1788134400"
+    }
+  },
+  "additional_rate_limits": [
+    {
+      "limit_name": "Broken limit",
+      "rate_limit": "unexpected"
+    },
+    {
+      "metered_feature": "future-model",
+      "rate_limit": {
+        "primary_window": {
+          "used_percent": 14,
+          "limit_window_seconds": 7200,
+          "reset_at": 1786705200
+        }
+      }
+    }
+  ]
+}

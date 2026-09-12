@@ -36,7 +36,7 @@
 - Consumes: Codex Glass commit `d66821aa28c8c5293604949dad48ad9e9e99b434`.
 - Produces: une copie autonome compilable de la base Codex Glass dans le repo Codex Deck, avant toute transformation.
 
-- [ ] **Step 1: Importer exactement les sources nécessaires depuis le commit de référence**
+- [x] **Step 1: Importer exactement les sources nécessaires depuis le commit de référence**
 
 ```powershell
 $source = Join-Path $env:TEMP "codex-glass-codex-deck-bootstrap"
@@ -49,7 +49,7 @@ Copy-Item "$source\src" . -Recurse -Force
 Copy-Item "$source\tests" . -Recurse -Force
 ```
 
-- [ ] **Step 2: Documenter la provenance avant modification**
+- [x] **Step 2: Documenter la provenance avant modification**
 
 Créer `docs/bootstrap/CODEX_GLASS_PROVENANCE.md` :
 
@@ -64,7 +64,7 @@ Le snapshot initial comprend `src/`, `tests/`, `.gitignore` et `CMakeLists.txt`.
 La logique spécifique quotas/tokens n'est conservée que pour établir une baseline compilable avant son retrait contrôlé.
 ```
 
-- [ ] **Step 3: Compiler la baseline Debug**
+- [x] **Step 3: Compiler la baseline Debug**
 
 ```powershell
 cmake -S . -B build-baseline -G Ninja -DCMAKE_BUILD_TYPE=Debug
@@ -74,7 +74,7 @@ ctest --test-dir build-baseline -C Debug --output-on-failure
 
 Expected: compilation et tests identiques à Codex Glass au commit importé.
 
-- [ ] **Step 4: Compiler la baseline Release**
+- [x] **Step 4: Compiler la baseline Release**
 
 ```powershell
 cmake -S . -B build-baseline-release -G Ninja -DCMAKE_BUILD_TYPE=Release

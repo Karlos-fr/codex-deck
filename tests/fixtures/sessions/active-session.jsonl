@@ -1,0 +1,5 @@
+{"timestamp":"2026-08-13T21:58:00Z","type":"session_meta","payload":{"id":"fixture-session-active","cwd":"C:\\fixture"}}
+{"timestamp":"2026-08-13T21:58:01Z","type":"turn_context","payload":{"model":"gpt-5.3-codex","turn_id":"turn-1"}}
+{"timestamp":"2026-08-13T21:58:03Z","type":"event_msg","payload":{"type":"token_count","turn_id":"turn-1","info":{"last_token_usage":{"input_tokens":1000,"cached_input_tokens":600,"output_tokens":200,"reasoning_output_tokens":50},"total_token_usage":{"input_tokens":1000,"cached_input_tokens":600,"output_tokens":200,"reasoning_output_tokens":50}}}}
+{"timestamp":"2026-08-13T21:59:00Z","type":"event_msg","payload":{"type":"token_count","turn_id":"turn-2","info":{"last_token_usage":{"input_tokens":400,"cached_input_tokens":100,"output_tokens":80,"reasoning_output_tokens":20},"total_token_usage":{"input_tokens":1400,"cached_input_tokens":700,"output_tokens":280,"reasoning_output_tokens":70}}}}
+{"timestamp":"2026-08-13T22:01:00Z","type":"event_msg","payload":{"type":"token_count","turn_id":"partial"
