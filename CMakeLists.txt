@@ -118,8 +118,18 @@ add_executable(CodexDeck WIN32
     src/codex/JsonRpcTransport.cpp
     src/graphics/CompositionHost.cpp
     src/main.cpp
+    src/model/SessionCatalog.cpp
+    src/projects/GitProjectProbe.cpp
+    src/projects/PathNormalization.cpp
+    src/projects/ProjectDetector.cpp
+    src/projects/ProjectRepository.cpp
     src/rendering/DeckRenderer.cpp
     src/resources/CodexDeck.rc
+    src/storage/AppDataPaths.cpp
+    src/storage/SchemaMigrator.cpp
+    src/storage/SessionMetadataRepository.cpp
+    src/storage/SqliteDatabase.cpp
+    src/sync/SessionSyncService.cpp
     src/theme/Theme.cpp
     src/win32/SingleInstance.cpp
     src/window/DeckWindow.cpp
@@ -155,6 +165,7 @@ target_link_libraries(CodexDeck PRIVATE
     dwmapi
     user32
     shell32
+    ole32
     gdi32
     uxtheme
     advapi32
@@ -564,4 +575,22 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/projects/ProjectA
     )
     target_link_libraries(ProjectAssignmentServiceTests PRIVATE sqlite3 nlohmann_json::nlohmann_json)
     add_test(NAME ProjectAssignmentServiceTests COMMAND ProjectAssignmentServiceTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/storage/AppDataPathsTests.cpp")
+    add_executable(AppDataPathsTests
+        tests/storage/AppDataPathsTests.cpp
+        src/storage/AppDataPaths.cpp
+    )
+    codex_deck_enable_cpp23(AppDataPathsTests)
+    codex_deck_enable_msvc_defaults(AppDataPathsTests)
+    target_include_directories(AppDataPathsTests PRIVATE src)
+    target_compile_definitions(AppDataPathsTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    target_link_libraries(AppDataPathsTests PRIVATE shell32 ole32)
+    add_test(NAME AppDataPathsTests COMMAND AppDataPathsTests)
 endif()

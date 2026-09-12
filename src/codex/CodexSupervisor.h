@@ -46,7 +46,10 @@ public:
     using ConnectionStateHandler = std::move_only_function<void(CodexConnectionState)>;
 
     // Handler de demande de resynchronisation.
-    using ResyncRequiredHandler = std::move_only_function<void()>;
+    using ResyncRequiredHandler = std::move_only_function<void(CodexClient&)>;
+
+    // Handler de client connecte.
+    using ConnectedClientHandler = std::move_only_function<void(CodexClient&)>;
 
     // ------------------------------------------------------------------------
     // Cree un superviseur inactif.
@@ -76,6 +79,14 @@ public:
     // - handler : callback appele apres reconnexion.
     // ------------------------------------------------------------------------
     void SetResyncRequiredHandler(ResyncRequiredHandler handler);
+
+    // ------------------------------------------------------------------------
+    // Installe le handler de client connecte.
+    //
+    // Parametres :
+    // - handler : callback appele apres chaque connexion reussie.
+    // ------------------------------------------------------------------------
+    void SetConnectedClientHandler(ConnectedClientHandler handler);
 
     // ------------------------------------------------------------------------
     // Demarre la supervision avec une factory injectable.
@@ -114,8 +125,19 @@ private:
 
     // ------------------------------------------------------------------------
     // Publie une demande de resynchronisation.
+    //
+    // Parametres :
+    // - client : client connecte disponible sur le worker.
     // ------------------------------------------------------------------------
-    void PublishResync();
+    void PublishResync(CodexClient& client);
+
+    // ------------------------------------------------------------------------
+    // Publie le client connecte courant.
+    //
+    // Parametres :
+    // - client : client connecte disponible sur le worker.
+    // ------------------------------------------------------------------------
+    void PublishConnectedClient(CodexClient& client);
 
     // Thread de supervision.
     std::jthread worker_;
@@ -131,4 +153,7 @@ private:
 
     // Callback de resynchronisation courant.
     ResyncRequiredHandler resync_handler_;
+
+    // Callback de client connecte courant.
+    ConnectedClientHandler connected_client_handler_;
 };

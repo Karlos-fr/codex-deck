@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
         states.push_back(state);
         condition.notify_all();
     });
-    supervisor.SetResyncRequiredHandler([&]() {
+    supervisor.SetResyncRequiredHandler([&](CodexClient&) {
         std::lock_guard lock(mutex);
         ++resync_count;
         condition.notify_all();

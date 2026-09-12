@@ -65,6 +65,23 @@ std::chrono::milliseconds BackoffDelay(int attempt) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(kMaximumReconnectDelay);
 }
 
+// ----------------------------------------------------------------------------
+// Attend un backoff tout en respectant une demande d'arret.
+//
+// Parametres :
+// - delay : duree maximale a attendre.
+// - stopping : indicateur d'arret du superviseur.
+// ----------------------------------------------------------------------------
+void InterruptibleBackoff(std::chrono::milliseconds delay, const std::atomic_bool& stopping) {
+    constexpr auto kSleepSlice = std::chrono::milliseconds(50);
+    auto remaining = delay;
+    while (!stopping && remaining > std::chrono::milliseconds::zero()) {
+        const auto slice = remaining < kSleepSlice ? remaining : kSleepSlice;
+        std::this_thread::sleep_for(slice);
+        remaining -= slice;
+    }
+}
+
 }  // namespace
 
 // ----------------------------------------------------------------------------
@@ -88,6 +105,14 @@ void CodexSupervisor::SetConnectionStateHandler(ConnectionStateHandler handler) 
 void CodexSupervisor::SetResyncRequiredHandler(ResyncRequiredHandler handler) {
     std::lock_guard lock(handler_mutex_);
     resync_handler_ = std::move(handler);
+}
+
+// ----------------------------------------------------------------------------
+// Installe le handler de client connecte.
+// ----------------------------------------------------------------------------
+void CodexSupervisor::SetConnectedClientHandler(ConnectedClientHandler handler) {
+    std::lock_guard lock(handler_mutex_);
+    connected_client_handler_ = std::move(handler);
 }
 
 // ----------------------------------------------------------------------------
@@ -135,14 +160,14 @@ void CodexSupervisor::Run(LaunchSpecFactory factory) {
         const auto spec = factory();
         if (!spec) {
             PublishState(CodexConnectionState::Unavailable);
-            std::this_thread::sleep_for(BackoffDelay(reconnect_attempt++));
+            InterruptibleBackoff(BackoffDelay(reconnect_attempt++), stopping_);
             continue;
         }
 
         CodexProcess process;
         if (!process.Start(*spec)) {
             PublishState(CodexConnectionState::Unavailable);
-            std::this_thread::sleep_for(BackoffDelay(reconnect_attempt++));
+            InterruptibleBackoff(BackoffDelay(reconnect_attempt++), stopping_);
             continue;
         }
 
@@ -163,7 +188,7 @@ void CodexSupervisor::Run(LaunchSpecFactory factory) {
         if (!transport.Start(process.TakeStdoutReadHandle(), stdin_write)) {
             process.Stop();
             PublishState(CodexConnectionState::Unavailable);
-            std::this_thread::sleep_for(BackoffDelay(reconnect_attempt++));
+            InterruptibleBackoff(BackoffDelay(reconnect_attempt++), stopping_);
             continue;
         }
 
@@ -192,13 +217,14 @@ void CodexSupervisor::Run(LaunchSpecFactory factory) {
             transport.Stop();
             process.Stop();
             PublishState(CodexConnectionState::Unavailable);
-            std::this_thread::sleep_for(BackoffDelay(reconnect_attempt++));
+            InterruptibleBackoff(BackoffDelay(reconnect_attempt++), stopping_);
             continue;
         }
 
         PublishState(CodexConnectionState::Connected);
+        PublishConnectedClient(client);
         if (connected_once) {
-            PublishResync();
+            PublishResync(client);
         }
         connected_once = true;
         reconnect_attempt = 0;
@@ -222,7 +248,7 @@ void CodexSupervisor::Run(LaunchSpecFactory factory) {
         transport.Stop();
         if (!stopping_) {
             PublishState(CodexConnectionState::Reconnecting);
-            std::this_thread::sleep_for(BackoffDelay(reconnect_attempt++));
+            InterruptibleBackoff(BackoffDelay(reconnect_attempt++), stopping_);
         }
     }
 }
@@ -240,9 +266,19 @@ void CodexSupervisor::PublishState(CodexConnectionState state) {
 // ----------------------------------------------------------------------------
 // Publie une demande de resynchronisation.
 // ----------------------------------------------------------------------------
-void CodexSupervisor::PublishResync() {
+void CodexSupervisor::PublishResync(CodexClient& client) {
     std::lock_guard lock(handler_mutex_);
     if (resync_handler_) {
-        resync_handler_();
+        resync_handler_(client);
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Publie le client connecte courant.
+// ----------------------------------------------------------------------------
+void CodexSupervisor::PublishConnectedClient(CodexClient& client) {
+    std::lock_guard lock(handler_mutex_);
+    if (connected_client_handler_) {
+        connected_client_handler_(client);
     }
 }

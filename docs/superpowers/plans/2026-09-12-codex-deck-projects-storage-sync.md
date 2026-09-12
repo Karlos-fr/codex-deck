@@ -428,7 +428,7 @@ git commit -m "feat: order and assign Codex Deck sessions"
 - Produces: `CodexDeckDatabasePath() -> filesystem::path`.
 - Consumes: `SessionSyncService`, `CodexSupervisor`.
 
-- [ ] **Step 1: Tester le chemin applicatif**
+- [x] **Step 1: Tester le chemin applicatif**
 
 Avec une racine LocalAppData injectée `C:\Users\Test\AppData\Local`, attendre :
 
@@ -436,11 +436,11 @@ Avec une racine LocalAppData injectée `C:\Users\Test\AppData\Local`, attendre :
 C:\Users\Test\AppData\Local\CodexDeck\codex-deck.db
 ```
 
-- [ ] **Step 2: Implémenter `AppDataPaths` avec `SHGetKnownFolderPath(FOLDERID_LocalAppData)`**
+- [x] **Step 2: Implémenter `AppDataPaths` avec `SHGetKnownFolderPath(FOLDERID_LocalAppData)`**
 
 Créer le répertoire `CodexDeck` avec `std::filesystem::create_directories` avant ouverture DB.
 
-- [ ] **Step 3: Orchestrer l’ordre de lancement**
+- [x] **Step 3: Orchestrer l’ordre de lancement**
 
 Dans `DeckApp::Run` :
 
@@ -454,7 +454,7 @@ Dans `DeckApp::Run` :
 
 Le renderer peut afficher un état local vide pendant 2–4 ; aucune attente réseau/process avant `ShowWindow`.
 
-- [ ] **Step 4: Validation complète**
+- [x] **Step 4: Validation complète**
 
 ```powershell
 cmake --preset debug
@@ -467,7 +467,7 @@ ctest --preset release --output-on-failure
 
 Test manuel : lancer une fois avec Codex disponible, fermer, relancer avec Codex volontairement indisponible ; le cache de sessions/projets doit rester chargeable sans écran bloquant.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app src/storage tests/storage

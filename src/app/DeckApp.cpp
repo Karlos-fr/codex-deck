@@ -7,12 +7,22 @@
 
 #include "DeckApp.h"
 
+#include "../projects/GitProjectProbe.h"
+#include "../storage/AppDataPaths.h"
+#include "../storage/SchemaMigrator.h"
+#include "../storage/SqliteDatabase.h"
+#include "../sync/SessionSyncService.h"
 #include "../window/DeckWindow.h"
+
+#include <vector>
 
 // ----------------------------------------------------------------------------
 // Libere les ressources applicatives possedees.
 // ----------------------------------------------------------------------------
-DeckApp::~DeckApp() = default;
+DeckApp::~DeckApp() {
+    StopStorageWorker();
+    codex_supervisor_.Stop();
+}
 
 // ----------------------------------------------------------------------------
 // Lance la boucle de messages de l'application.
@@ -26,6 +36,13 @@ int DeckApp::Run(HINSTANCE instance, int command_show) {
     RefreshTheme(hwnd);
     ShowWindow(hwnd, command_show);
     UpdateWindow(hwnd);
+    StartStorageWorker();
+    codex_supervisor_.SetConnectedClientHandler([this](CodexClient& client) {
+        RefreshSessionsFromCodex(client);
+    });
+    codex_supervisor_.SetResyncRequiredHandler([this](CodexClient& client) {
+        RefreshSessionsFromCodex(client);
+    });
     codex_supervisor_.Start();
 
     MSG message{};
@@ -114,6 +131,7 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
         return 0;
     case WM_DESTROY:
         codex_supervisor_.Stop();
+        StopStorageWorker();
         renderer_.DiscardDeviceResources();
         PostQuitMessage(0);
         return 0;
@@ -128,4 +146,99 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
 void DeckApp::RefreshTheme(HWND hwnd) {
     resolved_theme_ = ResolveTheme(settings_.theme_mode, IsSystemDarkTheme());
     ApplySystemWindowTheme(hwnd, resolved_theme_);
+}
+
+// ----------------------------------------------------------------------------
+// Demarre le worker de stockage cache-first.
+// ----------------------------------------------------------------------------
+void DeckApp::StartStorageWorker() {
+    StopStorageWorker();
+    storage_stopping_ = false;
+    storage_worker_ = std::jthread([this](std::stop_token stop_token) {
+        auto database_path = CodexDeckDatabasePath();
+        if (!database_path) {
+            return;
+        }
+        auto database = OpenDatabase(*database_path);
+        if (!database) {
+            return;
+        }
+        SchemaMigrator migrator;
+        if (auto migrated = migrator.Migrate(*database); !migrated) {
+            return;
+        }
+
+        GitProjectProbe git_probe;
+        SessionSyncService sync_service(*database, session_catalog_, git_probe, [](ThreadListOptions) {
+            return std::unexpected(CodexError{CodexErrorCode::Disconnected, L"Aucun client Codex connecte"});
+        });
+        [[maybe_unused]] const auto cached = sync_service.LoadCachedState();
+
+        std::unique_lock lock(storage_mutex_);
+        while (!stop_token.stop_requested() && !storage_stopping_) {
+            storage_condition_.wait(lock, [this, &stop_token]() {
+                return stop_token.stop_requested() || storage_stopping_ || storage_refresh_requested_;
+            });
+            if (stop_token.stop_requested() || storage_stopping_) {
+                break;
+            }
+            storage_refresh_requested_ = false;
+            lock.unlock();
+            [[maybe_unused]] const auto refreshed = sync_service.RequestRefreshFromCodex();
+            lock.lock();
+        }
+    });
+}
+
+// ----------------------------------------------------------------------------
+// Arrete le worker de stockage cache-first.
+// ----------------------------------------------------------------------------
+void DeckApp::StopStorageWorker() {
+    storage_stopping_ = true;
+    storage_condition_.notify_all();
+    if (storage_worker_.joinable()) {
+        storage_worker_.request_stop();
+        storage_worker_.join();
+    }
+    storage_stopping_ = false;
+}
+
+// ----------------------------------------------------------------------------
+// Demande une reconciliation Codex/local au worker de stockage.
+// ----------------------------------------------------------------------------
+void DeckApp::RequestSessionRefresh() {
+    {
+        std::lock_guard lock(storage_mutex_);
+        storage_refresh_requested_ = true;
+    }
+    storage_condition_.notify_one();
+}
+
+// ----------------------------------------------------------------------------
+// Rafraichit le catalogue depuis un client Codex connecte.
+// ----------------------------------------------------------------------------
+void DeckApp::RefreshSessionsFromCodex(CodexClient& client) {
+    client.ListThreads(ThreadListOptions{}, [this](std::expected<std::vector<CodexThreadSummary>, CodexError> response) mutable {
+        if (!response || storage_stopping_) {
+            return;
+        }
+        auto database_path = CodexDeckDatabasePath();
+        if (!database_path) {
+            return;
+        }
+        auto database = OpenDatabase(*database_path);
+        if (!database) {
+            return;
+        }
+        SchemaMigrator migrator;
+        if (auto migrated = migrator.Migrate(*database); !migrated) {
+            return;
+        }
+
+        GitProjectProbe git_probe;
+        SessionSyncService sync_service(*database, session_catalog_, git_probe, [threads = std::move(*response)](ThreadListOptions) mutable {
+            return std::expected<std::vector<CodexThreadSummary>, CodexError>{std::move(threads)};
+        });
+        [[maybe_unused]] const auto refreshed = sync_service.RequestRefreshFromCodex();
+    });
 }
