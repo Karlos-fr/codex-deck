@@ -1,16 +1,14 @@
 // ============================================================================
-// Codex Glass - Point d'entree Win32
+// Codex Deck - Point d'entree Win32
 // ----------------------------------------------------------------------------
 // Ce fichier garde uniquement le point d'entree Unicode et delegue le cycle de
-// vie complet du widget a WidgetApp.
+// vie complet de l'application a DeckApp.
 // ============================================================================
 
-#include "app/WidgetApp.h"
+#include "app/DeckApp.h"
 #include "win32/SingleInstance.h"
 
 #include <windows.h>
-
-#include <memory>
 
 // ----------------------------------------------------------------------------
 // Active la prise en charge DPI par moniteur avant toute creation de fenetre.
@@ -43,6 +41,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int command_show) {
     }
 
     EnablePerMonitorDpiAwareness();
-    const std::unique_ptr<WidgetApp> app = std::make_unique<WidgetApp>();
-    return app->Run(instance, command_show);
+    DeckApp app;
+    return app.Run(instance, command_show);
 }

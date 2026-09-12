@@ -228,7 +228,7 @@ ctest --test-dir build -C Debug --output-on-failure
 
 Expected: `CodexDeck.exe`, PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A
@@ -257,7 +257,7 @@ git commit -m "refactor: rename bootstrap to Codex Deck and adopt C++23"
 - Produces: `CreateDeckMainWindow(HINSTANCE, WNDPROC, void*) -> HWND`.
 - Produces: `DeckRenderer::Initialize(HWND)`, `Resize(HWND)`, `Render(HWND, const DeckVisualState&)`.
 
-- [ ] **Step 1: Écrire le test de géométrie de fenêtre**
+- [x] **Step 1: Écrire le test de géométrie de fenêtre**
 
 Créer `tests/DeckWindowGeometryTests.cpp` avec un test pur de taille minimale :
 
@@ -273,7 +273,7 @@ int main() {
 }
 ```
 
-- [ ] **Step 2: Vérifier l’échec**
+- [x] **Step 2: Vérifier l’échec**
 
 Ajouter temporairement la cible de test CMake puis :
 
@@ -284,7 +284,7 @@ ctest --test-dir build -R DeckWindowGeometryTests --output-on-failure
 
 Expected: FAIL car `DeckWindow.h` n’existe pas.
 
-- [ ] **Step 3: Créer le contrat de fenêtre**
+- [x] **Step 3: Créer le contrat de fenêtre**
 
 `src/window/DeckWindow.h` :
 
@@ -300,7 +300,7 @@ void ApplyDeckWindowTheme(HWND hwnd, bool dark);
 
 `DeckMinimumClientSize()` retourne `{960, 640}`. La fenêtre initiale est centrée et créée avec un style desktop redimensionnable normal, sans logique docking/click-through.
 
-- [ ] **Step 4: Créer un modèle visuel minimal et le renderer**
+- [x] **Step 4: Créer un modèle visuel minimal et le renderer**
 
 `src/rendering/DeckRenderer.h` :
 
@@ -325,7 +325,7 @@ public:
 
 Pour cette tâche, réutiliser le chemin Direct2D/DirectWrite éprouvé de Codex Glass mais limiter le rendu à un fond, le titre et le sous-titre. Ne pas conserver les structures `UsageSnapshot` ou `TokenUsageSnapshot`.
 
-- [ ] **Step 5: Créer l’orchestrateur**
+- [x] **Step 5: Créer l’orchestrateur**
 
 `src/app/DeckApp.h` expose uniquement :
 
@@ -343,7 +343,7 @@ private:
 
 Le handler couvre au minimum `WM_NCCREATE`, `WM_CREATE`, `WM_SIZE`, `WM_DPICHANGED`, `WM_PAINT`, `WM_ERASEBKGND`, `WM_CLOSE`, `WM_DESTROY`.
 
-- [ ] **Step 6: Basculer `main.cpp` vers `DeckApp`**
+- [x] **Step 6: Basculer `main.cpp` vers `DeckApp`**
 
 ```cpp
 #include "app/DeckApp.h"
@@ -359,11 +359,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int command_show) {
 }
 ```
 
-- [ ] **Step 7: Réduire la cible CMake au socle réellement utilisé**
+- [x] **Step 7: Réduire la cible CMake au socle réellement utilisé**
 
 Retirer de `add_executable(CodexDeck ...)` les sources `usage`, `providers`, `tokens`, `activity`, graphes/quota et anciens contrôleurs `WidgetApp`. Conserver uniquement le socle encore référencé par `DeckApp`, le rendu minimal, les ressources, le Glass/Motion non métier et les helpers Win32 nécessaires.
 
-- [ ] **Step 8: Supprimer les fichiers métiers devenus orphelins**
+- [x] **Step 8: Supprimer les fichiers métiers devenus orphelins**
 
 Après une compilation réussie, supprimer les répertoires et fichiers métier qui ne sont plus référencés :
 
@@ -378,7 +378,7 @@ Remove-Item src/animation/WidgetRollingNumberAnimation.* -Force
 
 Supprimer également les fichiers `WidgetGraph*`, `WidgetRenderQuotaGraph*`, `WidgetRenderToken*`, `WidgetRenderKpiSummary*`, `WidgetRenderUsage*` et leurs contrôleurs seulement lorsqu’ils ne sont plus présents dans `CMakeLists.txt` et qu’aucun include restant ne les référence.
 
-- [ ] **Step 9: Valider**
+- [x] **Step 9: Valider**
 
 ```powershell
 cmake --build build

@@ -1,0 +1,107 @@
+// ============================================================================
+// Codex Deck - Implementation de l'orchestration applicative
+// ----------------------------------------------------------------------------
+// Ce fichier contient la boucle Win32 principale et reste limite a la
+// coordination entre fenetre, messages et renderer.
+// ============================================================================
+
+#include "DeckApp.h"
+
+#include "../window/DeckWindow.h"
+
+// ----------------------------------------------------------------------------
+// Lance la boucle de messages de l'application.
+// ----------------------------------------------------------------------------
+int DeckApp::Run(HINSTANCE instance, int command_show) {
+    HWND hwnd = CreateDeckMainWindow(instance, DeckApp::WindowProc, this);
+    if (hwnd == nullptr) {
+        return 1;
+    }
+
+    ApplyDeckWindowTheme(hwnd, false);
+    ShowWindow(hwnd, command_show);
+    UpdateWindow(hwnd);
+
+    MSG message{};
+    while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+        TranslateMessage(&message);
+        DispatchMessageW(&message);
+    }
+    return static_cast<int>(message.wParam);
+}
+
+// ----------------------------------------------------------------------------
+// Procedure Win32 statique redirigeant vers l'instance applicative.
+// ----------------------------------------------------------------------------
+LRESULT CALLBACK DeckApp::WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
+    if (message == WM_NCCREATE) {
+        const auto* create = reinterpret_cast<const CREATESTRUCTW*>(lparam);
+        auto* app = static_cast<DeckApp*>(create->lpCreateParams);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(app));
+        return TRUE;
+    }
+
+    auto* app = reinterpret_cast<DeckApp*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    if (app == nullptr) {
+        return DefWindowProcW(hwnd, message, wparam, lparam);
+    }
+    return app->HandleWindowMessage(hwnd, message, wparam, lparam);
+}
+
+// ----------------------------------------------------------------------------
+// Traite un message Win32 pour la fenetre principale.
+// ----------------------------------------------------------------------------
+LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
+    switch (message) {
+    case WM_CREATE:
+        renderer_.Initialize(hwnd);
+        return 0;
+    case WM_SIZE:
+        if (wparam != SIZE_MINIMIZED) {
+            renderer_.Resize(hwnd);
+            InvalidateRect(hwnd, nullptr, FALSE);
+        }
+        return 0;
+    case WM_GETMINMAXINFO: {
+        const SIZE minimum = DeckMinimumClientSize();
+        auto* info = reinterpret_cast<MINMAXINFO*>(lparam);
+        RECT rect{0, 0, minimum.cx, minimum.cy};
+        AdjustWindowRectEx(&rect, WS_OVERLAPPEDWINDOW, FALSE, 0);
+        info->ptMinTrackSize.x = rect.right - rect.left;
+        info->ptMinTrackSize.y = rect.bottom - rect.top;
+        return 0;
+    }
+    case WM_DPICHANGED: {
+        const auto* suggested = reinterpret_cast<const RECT*>(lparam);
+        SetWindowPos(
+            hwnd,
+            nullptr,
+            suggested->left,
+            suggested->top,
+            suggested->right - suggested->left,
+            suggested->bottom - suggested->top,
+            SWP_NOZORDER | SWP_NOACTIVATE
+        );
+        renderer_.Resize(hwnd);
+        return 0;
+    }
+    case WM_PAINT: {
+        PAINTSTRUCT paint{};
+        BeginPaint(hwnd, &paint);
+        EndPaint(hwnd, &paint);
+        renderer_.Render(hwnd, visual_state_);
+        return 0;
+    }
+    case WM_ERASEBKGND:
+        return 1;
+    case WM_CLOSE:
+        DestroyWindow(hwnd);
+        return 0;
+    case WM_DESTROY:
+        renderer_.DiscardDeviceResources();
+        PostQuitMessage(0);
+        return 0;
+    default:
+        return DefWindowProcW(hwnd, message, wparam, lparam);
+    }
+}
