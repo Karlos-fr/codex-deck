@@ -347,3 +347,36 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/codex/CodexClient
     target_link_libraries(CodexClientTests PRIVATE nlohmann_json::nlohmann_json)
     add_test(NAME CodexClientTests COMMAND CodexClientTests $<TARGET_FILE:FakeAppServer>)
 endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/model/SessionRuntimeTests.cpp")
+    add_executable(SessionRuntimeTests
+        tests/model/SessionRuntimeTests.cpp
+        src/model/SessionRuntimeRegistry.cpp
+    )
+    codex_deck_enable_cpp23(SessionRuntimeTests)
+    codex_deck_enable_msvc_defaults(SessionRuntimeTests)
+    target_include_directories(SessionRuntimeTests PRIVATE src)
+    target_link_libraries(SessionRuntimeTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME SessionRuntimeTests COMMAND SessionRuntimeTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/codex/CodexApprovalTests.cpp")
+    add_executable(CodexApprovalTests
+        tests/codex/CodexApprovalTests.cpp
+        src/codex/CodexEventRouter.cpp
+        src/codex/CodexProtocol.cpp
+        src/codex/JsonRpcTransport.cpp
+        src/model/SessionRuntimeRegistry.cpp
+    )
+    codex_deck_enable_cpp23(CodexApprovalTests)
+    codex_deck_enable_msvc_defaults(CodexApprovalTests)
+    target_include_directories(CodexApprovalTests PRIVATE src)
+    target_compile_definitions(CodexApprovalTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    target_link_libraries(CodexApprovalTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME CodexApprovalTests COMMAND CodexApprovalTests)
+endif()

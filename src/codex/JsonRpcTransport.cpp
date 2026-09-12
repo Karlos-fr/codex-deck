@@ -272,7 +272,6 @@ std::expected<void, CodexError> JsonRpcTransport::WriteJsonLine(const nlohmann::
         }
         offset += written;
     }
-    FlushFileBuffers(stdin_write_);
     return {};
 }
 

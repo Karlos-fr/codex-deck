@@ -419,7 +419,7 @@ git commit -m "feat: add typed Codex app-server client"
 - Produces: `SessionRuntimeRegistry::ApplyNotification(const CodexNotification&)`.
 - Produces: `PendingApproval` et `ResolveApproval(request_id, wire_decision)`.
 
-- [ ] **Step 1: Définir le runtime**
+- [x] **Step 1: Définir le runtime**
 
 ```cpp
 struct PendingApproval {
@@ -442,7 +442,7 @@ struct SessionRuntime {
 };
 ```
 
-- [ ] **Step 2: Écrire les transitions de test**
+- [x] **Step 2: Écrire les transitions de test**
 
 Vérifier :
 
@@ -454,7 +454,7 @@ turn/completed -> Completed
 turn/error     -> Error
 ```
 
-- [ ] **Step 3: Parser les deux approvals V1**
+- [x] **Step 3: Parser les deux approvals V1**
 
 Supporter :
 
@@ -465,11 +465,11 @@ item/fileChange/requestApproval
 
 Si `availableDecisions` est présent, conserver exactement les valeurs annoncées. Sinon exposer `accept` et `decline`. La réponse renvoie `{"decision": wire_decision}` au même `id` JSON-RPC.
 
-- [ ] **Step 4: Conserver les notifications brutes utiles au futur Workbench**
+- [x] **Step 4: Conserver les notifications brutes utiles au futur Workbench**
 
 `CodexEventRouter` publie un `CodexTimelineEvent` générique contenant `thread_id`, `method`, `params`, `received_at`; le Workbench spécialisé sera construit dans un plan ultérieur.
 
-- [ ] **Step 5: Valider et commit**
+- [x] **Step 5: Valider et commit**
 
 ```powershell
 cmake --build --preset debug
