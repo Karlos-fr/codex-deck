@@ -7,6 +7,7 @@
 
 #include "DeckRenderer.h"
 
+#include "../input/KeyboardShortcuts.h"
 #include "../navigation/ActivityBarModel.h"
 #include "../navigation/ActivityBarView.h"
 #include "../navigation/CommandPaletteModel.h"
@@ -14,6 +15,7 @@
 #include "../navigation/ProjectTreeModel.h"
 #include "../navigation/TreeHitTesting.h"
 #include "../navigation/ProjectTreeView.h"
+#include "../navigation/TreeDragController.h"
 #include "../ui/ScrollState.h"
 
 #include <dwrite.h>
@@ -56,6 +58,9 @@ struct DeckRenderer::Impl {
     // Vue de Command Palette.
     CommandPaletteView command_palette_view;
 
+    // Controleur de drag interne du Tree.
+    TreeDragController tree_drag;
+
     // Lignes synthetiques de debug pour valider le rendu volumineux.
     std::vector<TreeRow> debug_tree_rows;
 
@@ -86,6 +91,18 @@ struct DeckRenderer::Impl {
     // Entree de palette selectionnee.
     std::size_t command_palette_selection = 0;
 
+    // Indique qu'un renommage inline synthetique est en cours.
+    bool rename_active = false;
+
+    // Thread renomme en cours.
+    std::optional<CodexThreadId> rename_thread;
+
+    // Titre avant edition pour restauration locale.
+    std::string rename_original_title;
+
+    // Titre edite localement.
+    std::wstring rename_buffer;
+
     // ------------------------------------------------------------------------
     // Reconstruit les lignes synthetiques depuis l'etat courant.
     // ------------------------------------------------------------------------
@@ -95,6 +112,14 @@ struct DeckRenderer::Impl {
     // Reconstruit les entrees de Command Palette depuis la requete courante.
     // ------------------------------------------------------------------------
     void RebuildCommandPalette();
+
+    // ------------------------------------------------------------------------
+    // Execute une commande applicative sur l'etat synthetique local.
+    //
+    // Parametres :
+    // - command : type de commande a traiter.
+    // ------------------------------------------------------------------------
+    void ExecuteCommand(DeckCommandKind command);
 };
 
 namespace {
@@ -255,6 +280,34 @@ bool IsControlDown() {
     return (GetKeyState(VK_CONTROL) & 0x8000) != 0;
 }
 
+// ----------------------------------------------------------------------------
+// Indique si Shift est actuellement enfonce.
+//
+// Retour :
+// - true lorsque Shift est actif.
+// ----------------------------------------------------------------------------
+bool IsShiftDown() {
+    return (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+}
+
+// ----------------------------------------------------------------------------
+// Convertit un texte wide ASCII vers une chaine etroite.
+//
+// Parametres :
+// - text : texte source.
+//
+// Retour :
+// - texte ASCII de repli.
+// ----------------------------------------------------------------------------
+std::string NarrowAscii(std::wstring_view text) {
+    std::string narrow;
+    narrow.reserve(text.size());
+    for (const wchar_t character : text) {
+        narrow.push_back(character <= 0x7F ? static_cast<char>(character) : '?');
+    }
+    return narrow;
+}
+
 }  // namespace
 
 // ----------------------------------------------------------------------------
@@ -278,6 +331,52 @@ void DeckRenderer::Impl::RebuildCommandPalette() {
         command_palette_selection = command_palette_entries.size() - 1;
     } else if (command_palette_entries.empty()) {
         command_palette_selection = 0;
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Execute une commande applicative sur l'etat synthetique local.
+// ----------------------------------------------------------------------------
+void DeckRenderer::Impl::ExecuteCommand(DeckCommandKind command) {
+    if (debug_tree_rows.empty()) {
+        return;
+    }
+
+    switch (command) {
+    case DeckCommandKind::OpenCommandPalette:
+    case DeckCommandKind::OpenSearch:
+        command_palette_open = true;
+        command_palette_query.clear();
+        command_palette_selection = 0;
+        RebuildCommandPalette();
+        break;
+    case DeckCommandKind::RenameThread: {
+        const TreeRow& row = debug_tree_rows[selected_tree_row];
+        if (row.kind != TreeRowKind::Session || !row.thread_id) {
+            break;
+        }
+        rename_active = true;
+        rename_thread = row.thread_id;
+        rename_original_title = NarrowAscii(row.primary_text);
+        rename_buffer = row.primary_text;
+        break;
+    }
+    case DeckCommandKind::ArchiveThread: {
+        const TreeRow& row = debug_tree_rows[selected_tree_row];
+        if (row.kind != TreeRowKind::Session || !row.thread_id) {
+            break;
+        }
+        for (SessionRecord& session : debug_catalog.sessions) {
+            if (session.codex.id == *row.thread_id) {
+                session.codex.archived = true;
+                break;
+            }
+        }
+        RebuildDebugRows();
+        break;
+    }
+    default:
+        break;
     }
 }
 
@@ -470,8 +569,43 @@ void DeckRenderer::OnPointerDown(float x, float y) {
         return;
     }
     impl_->selected_tree_row = *hit;
+    impl_->tree_drag.Begin(impl_->debug_tree_rows[*hit], TreeDragPoint{x, y});
     impl_->tree_view.ActivateRow(impl_->debug_tree_rows[*hit]);
     ActivateTreeRow(impl_->tree_state, impl_->debug_tree_rows[*hit]);
+    impl_->RebuildDebugRows();
+}
+
+// ----------------------------------------------------------------------------
+// Traite un mouvement pointeur pour le drag interne Tree.
+// ----------------------------------------------------------------------------
+void DeckRenderer::OnPointerMove(float x, float y) {
+    if (impl_ == nullptr || impl_->debug_tree_rows.empty()) {
+        return;
+    }
+    const D2D1_RECT_F tree_bounds = D2D1::RectF(0.0F, kActivityBarHeight, kTreeDebugWidth, kActivityBarHeight + impl_->tree_scroll.viewport_extent);
+    const auto hit = HitTestTreeRow(D2D1::Point2F(x, y), tree_bounds, impl_->tree_scroll, impl_->tree_view.RowHeight(), impl_->debug_tree_rows.size());
+    const TreeRow* target = hit ? &impl_->debug_tree_rows[*hit] : nullptr;
+    impl_->tree_drag.Update(TreeDragPoint{x, y}, target);
+}
+
+// ----------------------------------------------------------------------------
+// Termine un clic ou drag pointeur pour le Tree.
+// ----------------------------------------------------------------------------
+void DeckRenderer::OnPointerUp(float x, float y) {
+    if (impl_ == nullptr) {
+        return;
+    }
+    OnPointerMove(x, y);
+    const auto assignment = impl_->tree_drag.Drop();
+    if (!assignment) {
+        return;
+    }
+    for (SessionRecord& session : impl_->debug_catalog.sessions) {
+        if (session.codex.id == assignment->thread_id) {
+            session.project_id = assignment->project_id;
+            break;
+        }
+    }
     impl_->RebuildDebugRows();
 }
 
@@ -483,11 +617,39 @@ bool DeckRenderer::OnKeyDown(WPARAM virtual_key) {
         return false;
     }
 
-    if (IsControlDown() && virtual_key == 'K') {
-        impl_->command_palette_open = true;
-        impl_->command_palette_query.clear();
-        impl_->command_palette_selection = 0;
-        impl_->RebuildCommandPalette();
+    if (impl_->rename_active) {
+        if (virtual_key == VK_ESCAPE) {
+            impl_->rename_active = false;
+            impl_->rename_thread.reset();
+            impl_->rename_buffer.clear();
+            return true;
+        }
+        if (virtual_key == VK_BACK) {
+            if (!impl_->rename_buffer.empty()) {
+                impl_->rename_buffer.pop_back();
+            }
+            return true;
+        }
+        if (virtual_key == VK_RETURN) {
+            if (impl_->rename_thread) {
+                for (SessionRecord& session : impl_->debug_catalog.sessions) {
+                    if (session.codex.id == *impl_->rename_thread) {
+                        session.codex.name = NarrowAscii(impl_->rename_buffer);
+                        break;
+                    }
+                }
+                impl_->RebuildDebugRows();
+            }
+            impl_->rename_active = false;
+            impl_->rename_thread.reset();
+            impl_->rename_buffer.clear();
+            return true;
+        }
+        return true;
+    }
+
+    if (const auto command = TranslateShortcut(KeyChord{virtual_key, IsControlDown(), IsShiftDown()})) {
+        impl_->ExecuteCommand(*command);
         return true;
     }
 
@@ -557,7 +719,20 @@ bool DeckRenderer::OnKeyDown(WPARAM virtual_key) {
 // Traite un caractere texte pour la Command Palette.
 // ----------------------------------------------------------------------------
 bool DeckRenderer::OnChar(wchar_t character) {
-    if (impl_ == nullptr || !impl_->command_palette_open) {
+    if (impl_ == nullptr) {
+        return false;
+    }
+    if (impl_->rename_active) {
+        if (character == L'\b' || character == L'\r' || character == L'\n' || character == L'\t') {
+            return true;
+        }
+        if (std::iswcntrl(character) != 0) {
+            return true;
+        }
+        impl_->rename_buffer.push_back(character);
+        return true;
+    }
+    if (!impl_->command_palette_open) {
         return false;
     }
     if (character == L'\b' || character == L'\r' || character == L'\n' || character == L'\t') {

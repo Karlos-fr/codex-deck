@@ -39,6 +39,18 @@ enum class DeckCommandKind {
 
     // Detacher le Workbench courant.
     DetachWorkbench,
+
+    // Ouvrir la Command Palette.
+    OpenCommandPalette,
+
+    // Ouvrir la recherche globale.
+    OpenSearch,
+
+    // Ouvrir une session runtime par son raccourci numerique.
+    OpenRuntimeSlot,
+
+    // Basculer vers la session runtime suivante.
+    CycleRuntimeSession,
 };
 
 // ----------------------------------------------------------------------------

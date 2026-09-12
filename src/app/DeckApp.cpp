@@ -94,10 +94,28 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
         return 0;
     case WM_LBUTTONDOWN:
     case WM_LBUTTONDBLCLK:
+        SetCapture(hwnd);
         renderer_.OnPointerDown(
             static_cast<float>(GET_X_LPARAM(lparam)),
             static_cast<float>(GET_Y_LPARAM(lparam))
         );
+        InvalidateRect(hwnd, nullptr, FALSE);
+        return 0;
+    case WM_MOUSEMOVE:
+        if ((wparam & MK_LBUTTON) != 0) {
+            renderer_.OnPointerMove(
+                static_cast<float>(GET_X_LPARAM(lparam)),
+                static_cast<float>(GET_Y_LPARAM(lparam))
+            );
+            InvalidateRect(hwnd, nullptr, FALSE);
+        }
+        return 0;
+    case WM_LBUTTONUP:
+        renderer_.OnPointerUp(
+            static_cast<float>(GET_X_LPARAM(lparam)),
+            static_cast<float>(GET_Y_LPARAM(lparam))
+        );
+        ReleaseCapture();
         InvalidateRect(hwnd, nullptr, FALSE);
         return 0;
     case WM_KEYDOWN:

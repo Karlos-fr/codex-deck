@@ -88,6 +88,24 @@ public:
     void OnPointerDown(float x, float y);
 
     // ------------------------------------------------------------------------
+    // Traite un mouvement pointeur pour le drag interne Tree.
+    //
+    // Parametres :
+    // - x : position horizontale en pixels client.
+    // - y : position verticale en pixels client.
+    // ------------------------------------------------------------------------
+    void OnPointerMove(float x, float y);
+
+    // ------------------------------------------------------------------------
+    // Termine un clic ou drag pointeur pour le Tree.
+    //
+    // Parametres :
+    // - x : position horizontale en pixels client.
+    // - y : position verticale en pixels client.
+    // ------------------------------------------------------------------------
+    void OnPointerUp(float x, float y);
+
+    // ------------------------------------------------------------------------
     // Traite une touche clavier de navigation Tree.
     //
     // Parametres :

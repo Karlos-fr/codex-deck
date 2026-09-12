@@ -321,7 +321,7 @@ git commit -m "feat: add Codex Deck command palette"
 - Produces: `TranslateShortcut(const KeyChord&) -> optional<DeckCommandKind>`.
 - Produces: `TreeDragController` qui ne modifie jamais directement SQLite.
 
-- [ ] **Step 1: Tester les raccourcis**
+- [x] **Step 1: Tester les raccourcis**
 
 Mapping exact :
 
@@ -337,26 +337,30 @@ Ctrl+Shift+D DetachWorkbench
 
 `Ctrl+1..9` et `Ctrl+Tab` sont réservés à la navigation des sessions runtime actives et routés via commandes applicatives.
 
-- [ ] **Step 2: Implémenter le renommage optimiste**
+- [x] **Step 2: Implémenter le renommage optimiste**
 
 Sur F2, éditer inline le titre. À validation : publier titre optimiste, appeler `CodexClient::SetThreadName`; succès conserve, échec restaure l’ancien titre et publie une erreur non modale.
 
-- [ ] **Step 3: Implémenter ArchiveThread**
+- [x] **Step 3: Implémenter ArchiveThread**
 
 Après `thread/archive` réussi, retirer la session de la vue normale et rafraîchir les métadonnées. En cas d’échec, aucun changement persistant de statut archive local.
 
-- [ ] **Step 4: Implémenter drag interne**
+- [x] **Step 4: Implémenter drag interne**
 
 À partir d’un mouvement > 6 DIPs sur une ligne Session, `TreeDragController` conserve le `thread_id`. Sur survol d’une ligne Project ou Unassigned, afficher la cible. Au drop appeler `ProjectAssignmentService::AssignManual`.
 
 Ne pas utiliser OLE pour ce drag interne ; OLE sera réservé au dépôt de fichiers externes dans le Workbench.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/input src/navigation src/app tests
 git commit -m "feat: add keyboard and tree session actions"
 ```
+
+Note d'implementation : le renommage et l'archive sont branches sur l'etat
+synthetique du Tree. Aucun appel app-server Codex reel n'est lance depuis l'UI
+tant qu'un bus de commandes UI -> worker n'est pas disponible.
 
 ---
 

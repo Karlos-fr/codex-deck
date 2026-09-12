@@ -117,6 +117,7 @@ add_executable(CodexDeck WIN32
     src/codex/CodexSupervisor.cpp
     src/codex/JsonRpcTransport.cpp
     src/graphics/CompositionHost.cpp
+    src/input/KeyboardShortcuts.cpp
     src/main.cpp
     src/model/ActivityOrdering.cpp
     src/model/SessionCatalog.cpp
@@ -127,6 +128,7 @@ add_executable(CodexDeck WIN32
     src/navigation/ProjectTreeModel.cpp
     src/navigation/ProjectTreeView.cpp
     src/navigation/TreeHitTesting.cpp
+    src/navigation/TreeDragController.cpp
     src/projects/GitProjectProbe.cpp
     src/projects/PathNormalization.cpp
     src/projects/ProjectDetector.cpp
@@ -678,4 +680,34 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/navigation/Comman
     target_include_directories(CommandPaletteModelTests PRIVATE src)
     target_link_libraries(CommandPaletteModelTests PRIVATE nlohmann_json::nlohmann_json)
     add_test(NAME CommandPaletteModelTests COMMAND CommandPaletteModelTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/input/KeyboardShortcutsTests.cpp")
+    add_executable(KeyboardShortcutsTests
+        tests/input/KeyboardShortcutsTests.cpp
+        src/input/KeyboardShortcuts.cpp
+    )
+    codex_deck_enable_cpp23(KeyboardShortcutsTests)
+    codex_deck_enable_msvc_defaults(KeyboardShortcutsTests)
+    target_include_directories(KeyboardShortcutsTests PRIVATE src)
+    target_compile_definitions(KeyboardShortcutsTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    target_link_libraries(KeyboardShortcutsTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME KeyboardShortcutsTests COMMAND KeyboardShortcutsTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/navigation/TreeDragControllerTests.cpp")
+    add_executable(TreeDragControllerTests
+        tests/navigation/TreeDragControllerTests.cpp
+        src/navigation/TreeDragController.cpp
+    )
+    codex_deck_enable_cpp23(TreeDragControllerTests)
+    codex_deck_enable_msvc_defaults(TreeDragControllerTests)
+    target_include_directories(TreeDragControllerTests PRIVATE src)
+    target_link_libraries(TreeDragControllerTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME TreeDragControllerTests COMMAND TreeDragControllerTests)
 endif()
