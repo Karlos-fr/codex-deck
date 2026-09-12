@@ -4,7 +4,7 @@
 
 **Goal:** Livrer Codex Deck V1 comme client Windows natif C++23 capable d’organiser, piloter et superviser plusieurs sessions Codex depuis un Tree + Workbench.
 
-**Architecture:** La V1 est découpée en six plans exécutables pour éviter un chantier monolithique. Le premier bootstrappe depuis Codex Glass au commit `d66821aa28c8c5293604949dad48ad9e9e99b434`; les suivants ajoutent l’intégration `codex app-server`, les projets/SQLite, la navigation, le Workbench, puis les fonctions multi-fenêtres et le durcissement final.
+**Architecture:** La V1 est découpée en sept plans exécutables pour éviter un chantier monolithique. Le premier bootstrappe depuis Codex Glass au commit `d66821aa28c8c5293604949dad48ad9e9e99b434`; les suivants ajoutent l’intégration `codex app-server`, les projets/SQLite, la navigation, les flux de cycle de vie projet/session, le Workbench, puis les fonctions multi-fenêtres et le durcissement final.
 
 **Tech Stack:** C++23, Win32, Direct2D, DirectWrite, DirectComposition, D3D11/DXGI, SQLite, nlohmann/json, CMake, CTest.
 
@@ -31,7 +31,7 @@
 
 ## Ordre d’exécution
 
-Avant le plan 1, lire `2026-09-12-codex-deck-shared-contracts.md`. Il ne s’agit pas d’un chantier supplémentaire mais du contrat commun aux six plans.
+Avant le plan 1, lire `2026-09-12-codex-deck-shared-contracts.md`. Il ne s’agit pas d’un chantier supplémentaire mais du contrat commun aux sept plans.
 
 1. `2026-09-12-codex-deck-bootstrap-foundation.md`
    - Importe le socle éprouvé de Codex Glass.
@@ -51,11 +51,15 @@ Avant le plan 1, lire `2026-09-12-codex-deck-shared-contracts.md`. Il ne s’agi
    - Ajoute Tree virtualisé, tri par activité récente, barre d’activité, recherche, Command Palette, raccourcis et drag & drop ciblé.
    - Sortie : navigation complète sur de grands jeux de données synthétiques.
 
-5. `2026-09-12-codex-deck-workbench.md`
+5. `2026-09-12-codex-deck-session-lifecycle.md`
+   - Ajoute gestion projets, création rapide de sessions, Open folder, favoris, Archive et détection des changements venant de VS Code/CLI.
+   - Sortie : tous les flux de cycle de vie V1 sont accessibles depuis l’UI.
+
+6. `2026-09-12-codex-deck-workbench.md`
    - Ajoute timeline virtualisée, Markdown natif, commandes/outils, approbations, fichiers/diffs, composer et streaming.
    - Sortie : une session Codex peut être réellement pilotée depuis Codex Deck.
 
-6. `2026-09-12-codex-deck-v1-hardening.md`
+7. `2026-09-12-codex-deck-v1-hardening.md`
    - Ajoute fenêtres détachées, restauration complète, notifications Windows, reduced motion, benchmarks, packaging et validation V1.
    - Sortie : V1 utilisable au quotidien.
 
@@ -77,4 +81,4 @@ réussissent, et que le critère de sortie du plan est vérifié manuellement lo
 
 ## Stratégie Git
 
-Chaque tâche du plan détaillé se termine par un commit focalisé. Les plans doivent être exécutés dans l’ordre ; ne pas démarrer le Workbench avant que les contrats `CodexClient`, `SessionRuntimeRegistry`, `SessionCatalog` et `Project` soient stabilisés par les plans précédents.
+Chaque tâche du plan détaillé se termine par un commit focalisé. Les plans doivent être exécutés dans l’ordre ; ne pas démarrer le Workbench avant que les contrats `CodexClient`, `SessionRuntimeRegistry`, `SessionCatalog`, `Project`, `SessionCreationController` et `DeckCommand` soient stabilisés par les plans précédents.
