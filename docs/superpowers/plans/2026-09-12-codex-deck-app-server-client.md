@@ -329,7 +329,7 @@ git commit -m "feat: add asynchronous JSON-RPC transport"
 - Produces: `ListThreads`, `ReadThread`, `StartThread`, `ResumeThread`, `SetThreadName`, `ArchiveThread`, `StartTurn`.
 - Consumes: `JsonRpcTransport`.
 
-- [ ] **Step 1: Étendre FakeAppServer avec les méthodes V2**
+- [x] **Step 1: Étendre FakeAppServer avec les méthodes V2**
 
 Réponses déterministes :
 
@@ -341,7 +341,7 @@ thread/archive  -> {}
 turn/start      -> turn id turn_1 puis notifications turn/started et turn/completed
 ```
 
-- [ ] **Step 2: Écrire un test de handshake + liste**
+- [x] **Step 2: Écrire un test de handshake + liste**
 
 `Connect()` doit d’abord envoyer `initialize` avec :
 
@@ -357,7 +357,7 @@ turn/start      -> turn id turn_1 puis notifications turn/started et turn/comple
 
 Le test échoue si `thread/list` est envoyé avant la réussite de `initialize`.
 
-- [ ] **Step 3: Définir les options et completions typées**
+- [x] **Step 3: Définir les options et completions typées**
 
 ```cpp
 struct StartThreadOptions {
@@ -375,7 +375,7 @@ using ThreadListCompletion = std::move_only_function<void(std::expected<std::vec
 using VoidCompletion = std::move_only_function<void(std::expected<void, CodexError>)>;
 ```
 
-- [ ] **Step 4: Implémenter les wire methods**
+- [x] **Step 4: Implémenter les wire methods**
 
 Méthodes minimales et paramètres :
 
@@ -391,11 +391,11 @@ turn/start       params {threadId, input:[{type:"text", text:prompt}]}
 
 Pour `thread/list`, poursuivre automatiquement les pages jusqu’à `nextCursor == null` afin d’exposer une liste complète au service de synchronisation.
 
-- [ ] **Step 5: Valider les opérations typées**
+- [x] **Step 5: Valider les opérations typées**
 
 Tester création → renommage → read → turn/start → archive contre FakeAppServer.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/codex/CodexClient.* tests/codex/CodexClientTests.cpp tests/fakes/FakeAppServer.cpp

@@ -326,3 +326,24 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/codex/JsonRpcTran
     target_link_libraries(JsonRpcTransportTests PRIVATE nlohmann_json::nlohmann_json)
     add_test(NAME JsonRpcTransportTests COMMAND JsonRpcTransportTests)
 endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/codex/CodexClientTests.cpp")
+    add_executable(CodexClientTests
+        tests/codex/CodexClientTests.cpp
+        src/codex/CodexClient.cpp
+        src/codex/CodexProcess.cpp
+        src/codex/CodexProtocol.cpp
+        src/codex/JsonRpcTransport.cpp
+    )
+    codex_deck_enable_cpp23(CodexClientTests)
+    codex_deck_enable_msvc_defaults(CodexClientTests)
+    target_include_directories(CodexClientTests PRIVATE src)
+    target_compile_definitions(CodexClientTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    target_link_libraries(CodexClientTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME CodexClientTests COMMAND CodexClientTests $<TARGET_FILE:FakeAppServer>)
+endif()
