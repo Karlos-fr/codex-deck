@@ -1,5 +1,7 @@
 <p align="center">
-  <a href="../README.md">Français</a> · <strong>English</strong>
+  <a href="../README.md"><img src="flag-fr.svg" alt="" width="18" height="12" /> Français</a>
+  /
+  <a href="README.en.md"><img src="flag-gb.svg" alt="" width="18" height="12" /> English</a>
 </p>
 
 # Codex Deck
