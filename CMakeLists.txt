@@ -118,7 +118,11 @@ add_executable(CodexDeck WIN32
     src/codex/JsonRpcTransport.cpp
     src/graphics/CompositionHost.cpp
     src/main.cpp
+    src/model/ActivityOrdering.cpp
     src/model/SessionCatalog.cpp
+    src/navigation/ProjectTreeModel.cpp
+    src/navigation/ProjectTreeView.cpp
+    src/navigation/TreeHitTesting.cpp
     src/projects/GitProjectProbe.cpp
     src/projects/PathNormalization.cpp
     src/projects/ProjectDetector.cpp
@@ -130,6 +134,8 @@ add_executable(CodexDeck WIN32
     src/storage/SessionMetadataRepository.cpp
     src/storage/SqliteDatabase.cpp
     src/sync/SessionSyncService.cpp
+    src/ui/ScrollState.cpp
+    src/ui/VirtualListLayout.cpp
     src/theme/Theme.cpp
     src/win32/SingleInstance.cpp
     src/window/DeckWindow.cpp
@@ -618,4 +624,17 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/VirtualListLay
     codex_deck_enable_msvc_defaults(VirtualListLayoutTests)
     target_include_directories(VirtualListLayoutTests PRIVATE src)
     add_test(NAME VirtualListLayoutTests COMMAND VirtualListLayoutTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/navigation/TreeHitTestingTests.cpp")
+    add_executable(TreeHitTestingTests
+        tests/navigation/TreeHitTestingTests.cpp
+        src/navigation/TreeHitTesting.cpp
+        src/ui/ScrollState.cpp
+    )
+    codex_deck_enable_cpp23(TreeHitTestingTests)
+    codex_deck_enable_msvc_defaults(TreeHitTestingTests)
+    target_include_directories(TreeHitTestingTests PRIVATE src)
+    target_link_libraries(TreeHitTestingTests PRIVATE d2d1)
+    add_test(NAME TreeHitTestingTests COMMAND TreeHitTestingTests)
 endif()

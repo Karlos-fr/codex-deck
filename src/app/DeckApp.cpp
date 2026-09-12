@@ -14,6 +14,8 @@
 #include "../sync/SessionSyncService.h"
 #include "../window/DeckWindow.h"
 
+#include <windowsx.h>
+
 #include <vector>
 
 // ----------------------------------------------------------------------------
@@ -86,6 +88,24 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
             InvalidateRect(hwnd, nullptr, FALSE);
         }
         return 0;
+    case WM_MOUSEWHEEL:
+        renderer_.OnMouseWheel(GET_WHEEL_DELTA_WPARAM(wparam));
+        InvalidateRect(hwnd, nullptr, FALSE);
+        return 0;
+    case WM_LBUTTONDOWN:
+    case WM_LBUTTONDBLCLK:
+        renderer_.OnPointerDown(
+            static_cast<float>(GET_X_LPARAM(lparam)),
+            static_cast<float>(GET_Y_LPARAM(lparam))
+        );
+        InvalidateRect(hwnd, nullptr, FALSE);
+        return 0;
+    case WM_KEYDOWN:
+        if (renderer_.OnKeyDown(wparam)) {
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_GETMINMAXINFO: {
         const SIZE minimum = DeckMinimumClientSize();
         auto* info = reinterpret_cast<MINMAXINFO*>(lparam);

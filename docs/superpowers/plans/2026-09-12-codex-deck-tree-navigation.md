@@ -160,11 +160,11 @@ git commit -m "feat: add virtual list and scroll primitives"
 - Produces: `HitTestTreeRow(point, rect, scroll, row_height, count) -> optional<size_t>`.
 - Produces: callbacks `OnSelectThread`, `OnToggleProject`, `OnOpenMore`.
 
-- [ ] **Step 1: Tester le hit testing**
+- [x] **Step 1: Tester le hit testing**
 
 Avec tree rect `(0,0,300,600)`, row height `30`, scroll `60`, un point y=15 doit correspondre à la ligne logique 2. Un point hors rect renvoie `nullopt`.
 
-- [ ] **Step 2: Implémenter le rendu visible uniquement**
+- [x] **Step 2: Implémenter le rendu visible uniquement**
 
 `ProjectTreeView::Render` :
 
@@ -180,19 +180,19 @@ void Render(
 
 Utiliser `ComputeVisibleRange` avec overscan 2. Dessiner indentation, chevron projet, point/statut session, titre, âge secondaire et sélection. Les lignes non visibles ne créent aucun `IDWriteTextLayout`.
 
-- [ ] **Step 3: Ajouter cache léger de layouts texte**
+- [x] **Step 3: Ajouter cache léger de layouts texte**
 
 Cache LRU borné à 256 entrées par `(stable_id, width, theme_revision, text_revision)`. Invalider au changement de DPI/thème/texte.
 
-- [ ] **Step 4: Brancher souris, wheel et clavier**
+- [x] **Step 4: Brancher souris, wheel et clavier**
 
 Supporter clic, double-clic session, molette, Up/Down, Left/Right pour collapse/expand, Enter pour ouvrir, Home/End.
 
-- [ ] **Step 5: Valider manuellement avec données synthétiques**
+- [x] **Step 5: Valider manuellement avec données synthétiques**
 
 Ajouter un mode de debug interne qui injecte 500 projets/10 000 sessions dans le modèle sans toucher SQLite. Scroller rapidement : pas de freeze perceptible.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/navigation src/ui src/rendering tests

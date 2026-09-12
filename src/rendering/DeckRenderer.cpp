@@ -7,10 +7,16 @@
 
 #include "DeckRenderer.h"
 
+#include "../navigation/ProjectTreeModel.h"
+#include "../navigation/TreeHitTesting.h"
+#include "../navigation/ProjectTreeView.h"
+#include "../ui/ScrollState.h"
+
 #include <dwrite.h>
 #include <wrl/client.h>
 
 #include <algorithm>
+#include <string>
 
 using Microsoft::WRL::ComPtr;
 
@@ -35,6 +41,29 @@ struct DeckRenderer::Impl {
 
     // Format du sous-titre.
     ComPtr<IDWriteTextFormat> subtitle_format;
+
+    // Vue Tree virtualisee.
+    ProjectTreeView tree_view;
+
+    // Lignes synthetiques de debug pour valider le rendu volumineux.
+    std::vector<TreeRow> debug_tree_rows;
+
+    // Catalogue synthetique conserve pour reconstruire les lignes.
+    SessionCatalogSnapshot debug_catalog;
+
+    // Etat de scroll synthetique.
+    ScrollState tree_scroll;
+
+    // Etat de deploiement synthetique.
+    ProjectTreeState tree_state;
+
+    // Ligne selectionnee au clavier.
+    std::size_t selected_tree_row = 0;
+
+    // ------------------------------------------------------------------------
+    // Reconstruit les lignes synthetiques depuis l'etat courant.
+    // ------------------------------------------------------------------------
+    void RebuildDebugRows();
 };
 
 namespace {
@@ -56,6 +85,9 @@ constexpr float kDeckTitleHeight = 46.0F;
 
 // Hauteur reservee au sous-titre en DIPs.
 constexpr float kDeckSubtitleHeight = 28.0F;
+
+// Largeur initiale du Tree en DIPs.
+constexpr float kTreeDebugWidth = 300.0F;
 
 // DPI Win32 standard utilise en repli.
 constexpr float kDefaultDpi = 96.0F;
@@ -92,7 +124,68 @@ float WindowDpi(HWND hwnd) {
     return dpi == 0 ? kDefaultDpi : static_cast<float>(dpi);
 }
 
+// ----------------------------------------------------------------------------
+// Cree un catalogue synthetique volumineux pour le mode debug interne.
+//
+// Retour :
+// - catalogue de test.
+// ----------------------------------------------------------------------------
+SessionCatalogSnapshot BuildDebugCatalog() {
+    SessionCatalogSnapshot catalog{};
+    constexpr int kProjectCount = 500;
+    constexpr int kSessionCount = 10'000;
+
+    for (int project_index = 0; project_index < kProjectCount; ++project_index) {
+        Project project{};
+        project.id = project_index + 1;
+        project.name = "Project " + std::to_string(project_index + 1);
+        catalog.projects.push_back(std::move(project));
+    }
+    for (int session_index = 0; session_index < kSessionCount; ++session_index) {
+        SessionRecord session{};
+        session.codex.id = "debug-" + std::to_string(session_index + 1);
+        session.codex.name = "Session " + std::to_string(session_index + 1);
+        session.codex.cwd = "D:\\Debug\\Project" + std::to_string((session_index % kProjectCount) + 1);
+        session.codex.updated_at = kSessionCount - session_index;
+        session.project_id = (session_index % kProjectCount) + 1;
+        session.status = session_index % 11 == 0 ? SessionStatus::Working : SessionStatus::Idle;
+        catalog.sessions.push_back(std::move(session));
+    }
+    return catalog;
+}
+
+// ----------------------------------------------------------------------------
+// Execute l'action principale d'une ligne.
+//
+// Parametres :
+// - state : etat du Tree.
+// - row : ligne active.
+// ----------------------------------------------------------------------------
+void ActivateTreeRow(ProjectTreeState& state, const TreeRow& row) {
+    if (row.kind == TreeRowKind::Project && row.project_id) {
+        if (state.expanded_projects.contains(*row.project_id)) {
+            state.expanded_projects.erase(*row.project_id);
+        } else {
+            state.expanded_projects.insert(*row.project_id);
+        }
+    } else if (row.kind == TreeRowKind::UnassignedHeader) {
+        state.unassigned_expanded = !state.unassigned_expanded;
+    } else if (row.kind == TreeRowKind::Session && row.thread_id) {
+        state.selected_thread = row.thread_id;
+    }
+}
+
 }  // namespace
+
+// ----------------------------------------------------------------------------
+// Reconstruit les lignes synthetiques depuis l'etat courant.
+// ----------------------------------------------------------------------------
+void DeckRenderer::Impl::RebuildDebugRows() {
+    debug_tree_rows = BuildProjectTreeRows(debug_catalog, tree_state);
+    if (!debug_tree_rows.empty() && selected_tree_row >= debug_tree_rows.size()) {
+        selected_tree_row = debug_tree_rows.size() - 1;
+    }
+}
 
 // ----------------------------------------------------------------------------
 // Cree un renderer sans allouer encore de ressources natives.
@@ -187,27 +280,116 @@ void DeckRenderer::Render(HWND hwnd, const DeckVisualState& state, const ThemePa
     }
 
     const D2D1_SIZE_F size = context->GetSize();
+    if (impl_->debug_tree_rows.empty()) {
+        constexpr int kProjectCount = 500;
+        for (int project_index = 0; project_index < kProjectCount; ++project_index) {
+            impl_->tree_state.expanded_projects.insert(project_index + 1);
+        }
+        impl_->debug_catalog = BuildDebugCatalog();
+        impl_->RebuildDebugRows();
+    }
     impl_->background_brush->SetColor(palette.window_background);
     impl_->title_brush->SetColor(palette.text);
     impl_->subtitle_brush->SetColor(palette.text_muted);
     context->Clear(palette.window_background);
     context->FillRectangle(D2D1::RectF(0.0F, 0.0F, size.width, size.height), impl_->background_brush.Get());
+    impl_->tree_scroll.viewport_extent = size.height;
+    impl_->tree_scroll.content_extent = static_cast<float>(impl_->debug_tree_rows.size()) * impl_->tree_view.RowHeight();
+    impl_->tree_scroll.Clamp();
+    impl_->tree_view.Render(
+        context,
+        D2D1::RectF(0.0F, 0.0F, std::min(kTreeDebugWidth, size.width), size.height),
+        impl_->debug_tree_rows,
+        impl_->tree_scroll,
+        palette
+    );
     context->DrawTextW(
         state.title.c_str(),
         static_cast<UINT32>(state.title.size()),
         impl_->title_format.Get(),
-        D2D1::RectF(kDeckContentLeft, kDeckContentTop, size.width - kDeckContentLeft, kDeckContentTop + kDeckTitleHeight),
+        D2D1::RectF(kTreeDebugWidth + kDeckContentLeft, kDeckContentTop, size.width - kDeckContentLeft, kDeckContentTop + kDeckTitleHeight),
         impl_->title_brush.Get()
     );
     context->DrawTextW(
         state.subtitle.c_str(),
         static_cast<UINT32>(state.subtitle.size()),
         impl_->subtitle_format.Get(),
-        D2D1::RectF(kDeckContentLeft, kDeckContentTop + kDeckTitleHeight, size.width - kDeckContentLeft, kDeckContentTop + kDeckTitleHeight + kDeckSubtitleHeight),
+        D2D1::RectF(kTreeDebugWidth + kDeckContentLeft, kDeckContentTop + kDeckTitleHeight, size.width - kDeckContentLeft, kDeckContentTop + kDeckTitleHeight + kDeckSubtitleHeight),
         impl_->subtitle_brush.Get()
     );
     if (!impl_->composition.EndDraw().has_value()) {
         DiscardDeviceResources();
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Traite une molette verticale pour la zone Tree.
+// ----------------------------------------------------------------------------
+void DeckRenderer::OnMouseWheel(int delta) {
+    if (impl_ == nullptr) {
+        return;
+    }
+    constexpr float kWheelLineHeight = 30.0F;
+    constexpr float kWheelLinesPerNotch = 3.0F;
+    impl_->tree_scroll.ScrollBy(-static_cast<float>(delta) / WHEEL_DELTA * kWheelLineHeight * kWheelLinesPerNotch);
+}
+
+// ----------------------------------------------------------------------------
+// Traite un clic pointeur pour la zone Tree.
+// ----------------------------------------------------------------------------
+void DeckRenderer::OnPointerDown(float x, float y) {
+    if (impl_ == nullptr || impl_->debug_tree_rows.empty()) {
+        return;
+    }
+    const D2D1_RECT_F tree_bounds = D2D1::RectF(0.0F, 0.0F, kTreeDebugWidth, impl_->tree_scroll.viewport_extent);
+    const auto hit = HitTestTreeRow(D2D1::Point2F(x, y), tree_bounds, impl_->tree_scroll, impl_->tree_view.RowHeight(), impl_->debug_tree_rows.size());
+    if (!hit) {
+        return;
+    }
+    impl_->selected_tree_row = *hit;
+    impl_->tree_view.ActivateRow(impl_->debug_tree_rows[*hit]);
+    ActivateTreeRow(impl_->tree_state, impl_->debug_tree_rows[*hit]);
+    impl_->RebuildDebugRows();
+}
+
+// ----------------------------------------------------------------------------
+// Traite une touche clavier de navigation Tree.
+// ----------------------------------------------------------------------------
+bool DeckRenderer::OnKeyDown(WPARAM virtual_key) {
+    if (impl_ == nullptr || impl_->debug_tree_rows.empty()) {
+        return false;
+    }
+
+    switch (virtual_key) {
+    case VK_UP:
+        if (impl_->selected_tree_row > 0) {
+            --impl_->selected_tree_row;
+            impl_->tree_scroll.EnsureVisible(impl_->selected_tree_row, impl_->tree_view.RowHeight());
+        }
+        return true;
+    case VK_DOWN:
+        if (impl_->selected_tree_row + 1 < impl_->debug_tree_rows.size()) {
+            ++impl_->selected_tree_row;
+            impl_->tree_scroll.EnsureVisible(impl_->selected_tree_row, impl_->tree_view.RowHeight());
+        }
+        return true;
+    case VK_HOME:
+        impl_->selected_tree_row = 0;
+        impl_->tree_scroll.EnsureVisible(impl_->selected_tree_row, impl_->tree_view.RowHeight());
+        return true;
+    case VK_END:
+        impl_->selected_tree_row = impl_->debug_tree_rows.empty() ? 0 : impl_->debug_tree_rows.size() - 1;
+        impl_->tree_scroll.EnsureVisible(impl_->selected_tree_row, impl_->tree_view.RowHeight());
+        return true;
+    case VK_RETURN:
+    case VK_LEFT:
+    case VK_RIGHT:
+        impl_->tree_view.ActivateRow(impl_->debug_tree_rows[impl_->selected_tree_row]);
+        ActivateTreeRow(impl_->tree_state, impl_->debug_tree_rows[impl_->selected_tree_row]);
+        impl_->RebuildDebugRows();
+        return true;
+    default:
+        return false;
     }
 }
 

@@ -71,6 +71,34 @@ public:
     void Render(HWND hwnd, const DeckVisualState& state, const ThemePalette& palette);
 
     // ------------------------------------------------------------------------
+    // Traite une molette verticale pour la zone Tree.
+    //
+    // Parametres :
+    // - delta : delta Win32 de molette.
+    // ------------------------------------------------------------------------
+    void OnMouseWheel(int delta);
+
+    // ------------------------------------------------------------------------
+    // Traite un clic pointeur pour la zone Tree.
+    //
+    // Parametres :
+    // - x : position horizontale en pixels client.
+    // - y : position verticale en pixels client.
+    // ------------------------------------------------------------------------
+    void OnPointerDown(float x, float y);
+
+    // ------------------------------------------------------------------------
+    // Traite une touche clavier de navigation Tree.
+    //
+    // Parametres :
+    // - virtual_key : code touche Win32.
+    //
+    // Retour :
+    // - true si la touche a ete consommee.
+    // ------------------------------------------------------------------------
+    bool OnKeyDown(WPARAM virtual_key);
+
+    // ------------------------------------------------------------------------
     // Libere les ressources graphiques dependantes du device.
     // ------------------------------------------------------------------------
     void DiscardDeviceResources();
