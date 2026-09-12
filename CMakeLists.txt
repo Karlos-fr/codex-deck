@@ -110,6 +110,12 @@ target_compile_definitions(sqlite3 PRIVATE
 add_executable(CodexDeck WIN32
     ${CMAKE_CURRENT_BINARY_DIR}/generated/VersionInfo.rc
     src/app/DeckApp.cpp
+    src/codex/CodexClient.cpp
+    src/codex/CodexExecutableResolver.cpp
+    src/codex/CodexProcess.cpp
+    src/codex/CodexProtocol.cpp
+    src/codex/CodexSupervisor.cpp
+    src/codex/JsonRpcTransport.cpp
     src/graphics/CompositionHost.cpp
     src/main.cpp
     src/rendering/DeckRenderer.cpp
@@ -379,4 +385,27 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/codex/CodexApprov
     )
     target_link_libraries(CodexApprovalTests PRIVATE nlohmann_json::nlohmann_json)
     add_test(NAME CodexApprovalTests COMMAND CodexApprovalTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/codex/CodexSupervisorTests.cpp")
+    add_executable(CodexSupervisorTests
+        tests/codex/CodexSupervisorTests.cpp
+        src/codex/CodexClient.cpp
+        src/codex/CodexExecutableResolver.cpp
+        src/codex/CodexProcess.cpp
+        src/codex/CodexProtocol.cpp
+        src/codex/CodexSupervisor.cpp
+        src/codex/JsonRpcTransport.cpp
+    )
+    codex_deck_enable_cpp23(CodexSupervisorTests)
+    codex_deck_enable_msvc_defaults(CodexSupervisorTests)
+    target_include_directories(CodexSupervisorTests PRIVATE src)
+    target_compile_definitions(CodexSupervisorTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    target_link_libraries(CodexSupervisorTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME CodexSupervisorTests COMMAND CodexSupervisorTests $<TARGET_FILE:FakeAppServer>)
 endif()

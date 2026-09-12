@@ -26,6 +26,7 @@ int DeckApp::Run(HINSTANCE instance, int command_show) {
     RefreshTheme(hwnd);
     ShowWindow(hwnd, command_show);
     UpdateWindow(hwnd);
+    codex_supervisor_.Start();
 
     MSG message{};
     while (GetMessageW(&message, nullptr, 0, 0) > 0) {
@@ -112,6 +113,7 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
         DestroyWindow(hwnd);
         return 0;
     case WM_DESTROY:
+        codex_supervisor_.Stop();
         renderer_.DiscardDeviceResources();
         PostQuitMessage(0);
         return 0;

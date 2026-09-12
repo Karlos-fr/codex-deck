@@ -494,11 +494,11 @@ git commit -m "feat: track multi-session Codex runtime state"
 - Produces: callback `OnConnectionStateChanged`.
 - Produces: callback `OnResyncRequired` après reconnexion réussie.
 
-- [ ] **Step 1: Étendre le fake avec un mode crash**
+- [x] **Step 1: Étendre le fake avec un mode crash**
 
 Argument `--exit-after-initialize` : après la réponse `initialize`, le fake termine avec code 17.
 
-- [ ] **Step 2: Écrire le test de reconnexion**
+- [x] **Step 2: Écrire le test de reconnexion**
 
 Injecter à `CodexSupervisor` une factory de launch specs qui lance d’abord le fake en mode crash puis le fake normal. Vérifier la séquence :
 
@@ -508,17 +508,17 @@ Starting -> Connected -> Reconnecting -> Connected
 
 et exactement un `OnResyncRequired` après la deuxième connexion.
 
-- [ ] **Step 3: Implémenter une stratégie bornée**
+- [x] **Step 3: Implémenter une stratégie bornée**
 
 Backoff de reconnexion : `250 ms`, `500 ms`, `1 s`, `2 s`, puis plafond `5 s`. Tant que l’application reste ouverte, continuer avec plafond 5 s. Un arrêt explicite annule immédiatement le `jthread` de supervision.
 
-- [ ] **Step 4: Intégrer au cycle de vie de `DeckApp`**
+- [x] **Step 4: Intégrer au cycle de vie de `DeckApp`**
 
 Le démarrage du supervisor se fait après création/affichage initial de la fenêtre. La fermeture de l’app appelle `Stop()` avant destruction des ressources graphiques.
 
 Ne jamais faire attendre la première peinture sur `Connect()`.
 
-- [ ] **Step 5: Validation complète**
+- [x] **Step 5: Validation complète**
 
 ```powershell
 cmake --preset debug
@@ -531,7 +531,7 @@ ctest --preset release --output-on-failure
 
 Lancer avec un vrai Codex installé : vérifier connexion puis `thread/list` dans les logs de diagnostic, sans afficher encore les sessions dans une UI riche.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/codex src/model src/app tests CMakeLists.txt

@@ -185,7 +185,7 @@ int main(int argc, char** argv) {
         return 10;
     }
 
-    transport.Stop();
     process.Stop();
+    transport.Stop();
     return 0;
 }

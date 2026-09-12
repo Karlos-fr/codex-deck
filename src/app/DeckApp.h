@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "../codex/CodexSupervisor.h"
 #include "../rendering/DeckRenderer.h"
 #include "../settings/DeckSettings.h"
 #include "../theme/Theme.h"
@@ -53,6 +54,9 @@ private:
 
     // Renderer Direct2D minimal de la coquille.
     DeckRenderer renderer_;
+
+    // Superviseur worker de l'unique app-server Codex.
+    CodexSupervisor codex_supervisor_;
 
     // Etat visuel affiche par le renderer.
     DeckVisualState visual_state_{};
