@@ -6,6 +6,8 @@ out/
 cmake-build-*/
 _codex_archive/
 build-baseline/
+build-baseline-release/
+build-baseline-release/
 
 # CMake
 CMakeCache.txt

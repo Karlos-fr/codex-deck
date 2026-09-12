@@ -196,7 +196,7 @@ void DrawMenuBanner(DRAWITEMSTRUCT* draw_item) {
         rect.right - kMenuBannerHorizontalPadding,
         rect.top + 21,
     };
-    const std::wstring title = T(IDS_APP_TITLE) + L" (" + CODEX_GLASS_FILE_VERSION_STRING + L")";
+    const std::wstring title = T(IDS_APP_TITLE) + L" (" + CODEX_DECK_FILE_VERSION_STRING + L")";
     SetTextColor(draw_item->hDC, kMenuBannerText);
     DrawTextW(
         draw_item->hDC,

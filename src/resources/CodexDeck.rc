@@ -1,5 +1,5 @@
 // ============================================================================
-// Codex Glass - Ressources Windows de l'executable
+// Codex Deck - Ressources Windows de l'executable
 // ----------------------------------------------------------------------------
 // Ce fichier fournit l'icone applicative et inclut les tables de chaines
 // localisees compilees dans l'executable. Les metadonnees de version Windows
@@ -10,8 +10,8 @@
 
 #include "ResourceIds.h"
 
-IDI_APP_ICON ICON "CodexGlass.ico"
-IDI_TRAY_ICON ICON "CodexGlassTray.ico"
+IDI_APP_ICON ICON "CodexDeck.ico"
+IDI_TRAY_ICON ICON "CodexDeckTray.ico"
 
 #include "strings.fr.rc"
 #include "strings.en.rc"

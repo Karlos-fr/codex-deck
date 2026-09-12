@@ -1,5 +1,5 @@
 // ============================================================================
-// Codex Glass - Tests du lancement avec Windows
+// Codex Deck - Tests du lancement avec Windows
 // ----------------------------------------------------------------------------
 // Ce fichier verifie les operations de registre dans une cle utilisateur de
 // test isolee. Il ne cree aucune entree dans la veritable cle Windows Run.
@@ -15,10 +15,10 @@
 namespace {
 
 // Cle isolee partagee avec WindowsStartup.cpp en compilation de test.
-constexpr wchar_t kTestRunKeyPath[] = L"Software\\CodexGlass\\Tests\\Run";
+constexpr wchar_t kTestRunKeyPath[] = L"Software\\CodexDeck\\Tests\\Run";
 
 // Nom de valeur isole partage avec WindowsStartup.cpp en compilation de test.
-constexpr wchar_t kTestRunValueName[] = L"CodexGlassStartupTests";
+constexpr wchar_t kTestRunValueName[] = L"CodexDeckStartupTests";
 
 // Capacite maximale prise en charge pour le chemin du binaire de test.
 constexpr DWORD kModulePathCapacity = 32768;
@@ -77,8 +77,8 @@ std::wstring ReadTestCommand() {
 // - retire uniquement l'arborescence HKCU reservee au test de demarrage.
 // ----------------------------------------------------------------------------
 void CleanupTestKeys() {
-    RegDeleteKeyW(HKEY_CURRENT_USER, L"Software\\CodexGlass\\Tests\\Run");
-    RegDeleteKeyW(HKEY_CURRENT_USER, L"Software\\CodexGlass\\Tests");
+    RegDeleteKeyW(HKEY_CURRENT_USER, L"Software\\CodexDeck\\Tests\\Run");
+    RegDeleteKeyW(HKEY_CURRENT_USER, L"Software\\CodexDeck\\Tests");
 }
 
 }  // namespace anonyme
@@ -90,7 +90,7 @@ void CleanupTestKeys() {
 // - zero si tous les scenarios reussissent, sinon le code du scenario fautif.
 //
 // Effet de bord :
-// - cree puis supprime une valeur sous HKCU\Software\CodexGlass\Tests.
+// - cree puis supprime une valeur sous HKCU\Software\CodexDeck\Tests.
 // ----------------------------------------------------------------------------
 int main() {
     if (!SetStartWithWindowsEnabled(false)) {

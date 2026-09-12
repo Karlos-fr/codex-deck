@@ -1,5 +1,5 @@
 // ============================================================================
-// Codex Glass - Declaration de l'instance unique
+// Codex Deck - Declaration de l'instance unique
 // ----------------------------------------------------------------------------
 // Ce fichier declare la possession d'un mutex Windows nomme. Il limite son
 // role a la detection d'une autre instance et ne demarre pas l'application.
@@ -8,6 +8,14 @@
 #pragma once
 
 #include <windows.h>
+
+// ----------------------------------------------------------------------------
+// Retourne le nom de mutex utilise par l'instance principale.
+//
+// Retour :
+// - nom Windows complet du mutex de production.
+// ----------------------------------------------------------------------------
+const wchar_t* DefaultSingleInstanceMutexName();
 
 // Indique le resultat de la tentative de reservation de l'instance unique.
 enum class SingleInstanceStatus {
@@ -22,12 +30,12 @@ enum class SingleInstanceStatus {
 };
 
 // ----------------------------------------------------------------------------
-// Conserve le mutex nomme qui identifie le processus Codex Glass principal.
+// Conserve le mutex nomme qui identifie le processus Codex Deck principal.
 // ----------------------------------------------------------------------------
 class SingleInstance {
 public:
     // ------------------------------------------------------------------------
-    // Tente de reserver le nom de mutex utilise par Codex Glass.
+    // Tente de reserver le nom de mutex utilise par Codex Deck.
     //
     // Effet de bord :
     // - cree un mutex Windows nomme lorsque aucune instance ne le possede.

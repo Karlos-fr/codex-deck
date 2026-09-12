@@ -7,7 +7,7 @@
 LANGUAGE 0x09, 0x01
 STRINGTABLE
 BEGIN
-    IDS_APP_TITLE "Codex Glass"
+    IDS_APP_TITLE "Codex Deck"
     IDS_USAGE_5H "5 h quota"
     IDS_USAGE_WEEK "Weekly quota"
     IDS_NOT_PROVIDED_BY_CODEX "Not provided by Codex"

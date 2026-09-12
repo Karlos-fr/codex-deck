@@ -44,7 +44,7 @@ void Require(bool condition, const char* message) {
 // Charge une fixture UTF-8 depuis le depot.
 // ----------------------------------------------------------------------------
 std::string LoadFixture(const char* relative_path) {
-    const std::string path = std::string(CODEX_GLASS_SOURCE_DIR) + "/tests/fixtures/" + relative_path;
+    const std::string path = std::string(CODEX_DECK_SOURCE_DIR) + "/tests/fixtures/" + relative_path;
     std::ifstream input(path, std::ios::binary);
     Require(static_cast<bool>(input), "fixture introuvable");
     std::ostringstream buffer;
@@ -162,7 +162,7 @@ void CopySessionFixture(
     const std::filesystem::path& relative_destination
 ) {
     const std::filesystem::path source =
-        std::filesystem::path(CODEX_GLASS_SOURCE_DIR) / "tests" / "fixtures" / "sessions" / fixture_name;
+        std::filesystem::path(CODEX_DECK_SOURCE_DIR) / "tests" / "fixtures" / "sessions" / fixture_name;
     const std::filesystem::path destination = profile / relative_destination;
     std::filesystem::create_directories(destination.parent_path());
     std::filesystem::copy_file(source, destination, std::filesystem::copy_options::overwrite_existing);

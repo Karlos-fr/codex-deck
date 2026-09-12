@@ -84,7 +84,7 @@ ctest --test-dir build-baseline-release -C Release --output-on-failure
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .gitignore CMakeLists.txt src tests docs/bootstrap/CODEX_GLASS_PROVENANCE.md
@@ -113,7 +113,7 @@ git commit -m "chore: bootstrap Codex Deck from Codex Glass"
 - Consumes: snapshot compilable de Task 1.
 - Produces: cible `CodexDeck.exe`, projet CMake `CodexDeck`, standard C++23, mutex `Local\\Karlos-fr.CodexDeck.Instance`.
 
-- [ ] **Step 1: Faire échouer un test sur l’identité du mutex**
+- [x] **Step 1: Faire échouer un test sur l’identité du mutex**
 
 Dans `tests/SingleInstanceTests.cpp`, remplacer le préfixe de test par :
 
@@ -135,7 +135,7 @@ if (std::wstring(DefaultSingleInstanceMutexName()) != L"Local\\Karlos-fr.CodexDe
 }
 ```
 
-- [ ] **Step 2: Vérifier l’échec**
+- [x] **Step 2: Vérifier l’échec**
 
 ```powershell
 cmake --build build-baseline
@@ -144,7 +144,7 @@ ctest --test-dir build-baseline -R SingleInstanceTests --output-on-failure
 
 Expected: FAIL car l’API et/ou le nom Codex Deck n’existent pas encore.
 
-- [ ] **Step 3: Renommer CMake et activer C++23**
+- [x] **Step 3: Renommer CMake et activer C++23**
 
 Dans `CMakeLists.txt`, appliquer ces règles exactes :
 
@@ -168,7 +168,7 @@ target_compile_features(CodexDeck PRIVATE cxx_std_23)
 
 Remplacer également `cxx_std_20` par `cxx_std_23` sur **toutes** les cibles de test C++.
 
-- [ ] **Step 4: Renommer l’identité Win32**
+- [x] **Step 4: Renommer l’identité Win32**
 
 Dans `src/win32/SingleInstance.cpp` :
 
@@ -188,7 +188,7 @@ SingleInstance::SingleInstance()
 
 Dans `src/resources/VersionInfo.rc.in`, utiliser `CodexDeck`, `CodexDeck.exe` et les variables `CODEX_DECK_*`. Dans les tables de chaînes, `IDS_APP_TITLE` devient `Codex Deck`.
 
-- [ ] **Step 5: Renommer les ressources et les références CMake**
+- [x] **Step 5: Renommer les ressources et les références CMake**
 
 ```powershell
 Rename-Item src/resources/CodexGlass.rc CodexDeck.rc
@@ -198,7 +198,7 @@ Rename-Item src/resources/CodexGlassTray.ico CodexDeckTray.ico
 
 Mettre `CodexDeck.rc` à jour pour référencer les deux nouveaux noms d’icônes.
 
-- [ ] **Step 6: Créer les règles repo Codex Deck**
+- [x] **Step 6: Créer les règles repo Codex Deck**
 
 `AGENTS.md` doit conserver les règles de modularité/commentaires de Codex Glass et remplacer la description par :
 
@@ -217,7 +217,7 @@ Codex Deck is a native Windows desktop client written in C++23 with Win32, Direc
 
 Créer un `README.md` minimal présentant Codex Deck, le statut pré-alpha, Windows 11 x64, C++23 et les commandes de build.
 
-- [ ] **Step 7: Reconfigurer depuis zéro et valider C++23**
+- [x] **Step 7: Reconfigurer depuis zéro et valider C++23**
 
 ```powershell
 Remove-Item build -Recurse -Force -ErrorAction SilentlyContinue

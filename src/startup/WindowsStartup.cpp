@@ -1,7 +1,7 @@
 // ============================================================================
 // Codex Glass - Implementation du lancement avec Windows
 // ----------------------------------------------------------------------------
-// Ce fichier gere la valeur CodexGlass de la cle Run de l'utilisateur courant.
+// Ce fichier gere la valeur CodexDeck de la cle Run de l'utilisateur courant.
 // Il n'ecrit jamais dans le fichier INI de l'application.
 // ============================================================================
 
@@ -16,13 +16,13 @@
 
 namespace {
 
-#if defined(CODEX_GLASS_STARTUP_TEST_REGISTRY)
+#if defined(CODEX_DECK_STARTUP_TEST_REGISTRY)
 
 // Cle utilisateur isolee utilisee uniquement par le binaire de test.
-constexpr wchar_t kRunKeyPath[] = L"Software\\CodexGlass\\Tests\\Run";
+constexpr wchar_t kRunKeyPath[] = L"Software\\CodexDeck\\Tests\\Run";
 
 // Nom de valeur isole utilise uniquement par le binaire de test.
-constexpr wchar_t kRunValueName[] = L"CodexGlassStartupTests";
+constexpr wchar_t kRunValueName[] = L"CodexDeckStartupTests";
 
 #else
 
@@ -30,7 +30,7 @@ constexpr wchar_t kRunValueName[] = L"CodexGlassStartupTests";
 constexpr wchar_t kRunKeyPath[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 
 // Nom de la valeur de demarrage reservee a l'application.
-constexpr wchar_t kRunValueName[] = L"CodexGlass";
+constexpr wchar_t kRunValueName[] = L"CodexDeck";
 
 #endif
 

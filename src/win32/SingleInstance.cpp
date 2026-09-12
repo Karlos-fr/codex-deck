@@ -1,5 +1,5 @@
 // ============================================================================
-// Codex Glass - Implementation de l'instance unique
+// Codex Deck - Implementation de l'instance unique
 // ----------------------------------------------------------------------------
 // Ce fichier reserve un mutex Windows nomme pendant la vie du processus. Il ne
 // connait ni la fenetre principale, ni l'icone de la zone de notification.
@@ -10,18 +10,28 @@
 namespace {
 
 // Nom stable du mutex limite a la session Windows de l'utilisateur.
-constexpr wchar_t kCodexGlassMutexName[] = L"Local\\Karlos-fr.CodexGlass.Instance";
+constexpr wchar_t kCodexDeckMutexName[] = L"Local\\Karlos-fr.CodexDeck.Instance";
 
 }  // namespace anonyme
 
 // ----------------------------------------------------------------------------
-// Tente de reserver le nom de mutex utilise par Codex Glass.
+// Tente de reserver le nom de mutex utilise par Codex Deck.
+//
+// Effet de bord :
+// - cree un mutex Windows nomme lorsque aucune instance ne le possede.
+// ----------------------------------------------------------------------------
+const wchar_t* DefaultSingleInstanceMutexName() {
+    return kCodexDeckMutexName;
+}
+
+// ----------------------------------------------------------------------------
+// Tente de reserver le nom de mutex utilise par Codex Deck.
 //
 // Effet de bord :
 // - cree un mutex Windows nomme lorsque aucune instance ne le possede.
 // ----------------------------------------------------------------------------
 SingleInstance::SingleInstance()
-    : SingleInstance(kCodexGlassMutexName) {
+    : SingleInstance(DefaultSingleInstanceMutexName()) {
 }
 
 // ----------------------------------------------------------------------------

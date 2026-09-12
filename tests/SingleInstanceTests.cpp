@@ -1,5 +1,5 @@
 // ============================================================================
-// Codex Glass - Tests de l'instance unique
+// Codex Deck - Tests de l'instance unique
 // ----------------------------------------------------------------------------
 // Ce fichier verifie la reservation d'un mutex Windows isole. Il n'utilise pas
 // le nom de production et ne lance ni fenetre ni icone de notification.
@@ -22,6 +22,9 @@ constexpr int kDuplicateDetectionFailure = 2;
 // Code de sortie utilise lorsque le mutex reste reserve apres destruction.
 constexpr int kReleaseFailure = 3;
 
+// Code de sortie utilise lorsque le mutex de production n'a pas ete renomme.
+constexpr int kDefaultMutexNameFailure = 4;
+
 // ----------------------------------------------------------------------------
 // Construit un nom de mutex propre au processus de test courant.
 //
@@ -29,7 +32,7 @@ constexpr int kReleaseFailure = 3;
 // - nom place dans l'espace local de la session Windows.
 // ----------------------------------------------------------------------------
 std::wstring BuildTestMutexName() {
-    return L"Local\\CodexGlass.SingleInstanceTests." + std::to_wstring(GetCurrentProcessId());
+    return L"Local\\CodexDeck.SingleInstanceTests." + std::to_wstring(GetCurrentProcessId());
 }
 
 }  // namespace anonyme
@@ -44,6 +47,10 @@ std::wstring BuildTestMutexName() {
 // - cree temporairement un mutex nomme limite au processus de test.
 // ----------------------------------------------------------------------------
 int main() {
+    if (std::wstring(DefaultSingleInstanceMutexName()) != L"Local\\Karlos-fr.CodexDeck.Instance") {
+        return kDefaultMutexNameFailure;
+    }
+
     const std::wstring mutex_name = BuildTestMutexName();
 
     {

@@ -1,12 +1,31 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(CodexGlass
+project(CodexDeck
     VERSION 0.1.0
-    DESCRIPTION "Codex Glass"
+    DESCRIPTION "Codex Deck"
     LANGUAGES C CXX RC
 )
 
 include(CTest)
+include(CheckCXXCompilerFlag)
+
+# Active C++23 strict sans laisser MSVC retomber sur /std:c++latest.
+function(codex_deck_enable_cpp23 target_name)
+    if(MSVC)
+        check_cxx_compiler_flag("/std:c++23" CODEX_DECK_HAS_STD_CPP23)
+        if(CODEX_DECK_HAS_STD_CPP23)
+            target_compile_options(${target_name} PRIVATE /std:c++23)
+        else()
+            check_cxx_compiler_flag("/std:c++23preview" CODEX_DECK_HAS_STD_CPP23_PREVIEW)
+            if(NOT CODEX_DECK_HAS_STD_CPP23_PREVIEW)
+                message(FATAL_ERROR "Codex Deck requires an MSVC toolchain with C++23 support")
+            endif()
+            target_compile_options(${target_name} PRIVATE /std:c++23preview)
+        endif()
+    else()
+        target_compile_features(${target_name} PRIVATE cxx_std_23)
+    endif()
+endfunction()
 
 # Privilegie la taille dans tous les artefacts Release MSVC sans empiler /O2
 # et /O1 sur la meme ligne de commande. Les autres configurations sont intactes.
@@ -19,26 +38,26 @@ endif()
 # detecte ici un prefixe /showIncludes mojibake qui empeche Ninja de suivre les
 # en-tetes. La chaine est reconstruite en UTF-8 avec les espaces insecables reels.
 if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
-    string(ASCII 194 160 CODEX_GLASS_UTF8_NBSP)
-    set(CODEX_GLASS_SHOWINCLUDES_PREFIX
-        "Remarque${CODEX_GLASS_UTF8_NBSP}: inclusion du fichier${CODEX_GLASS_UTF8_NBSP}:"
+    string(ASCII 194 160 CODEX_DECK_UTF8_NBSP)
+    set(CODEX_DECK_SHOWINCLUDES_PREFIX
+        "Remarque${CODEX_DECK_UTF8_NBSP}: inclusion du fichier${CODEX_DECK_UTF8_NBSP}:"
     )
-    set(CMAKE_C_CL_SHOWINCLUDES_PREFIX "${CODEX_GLASS_SHOWINCLUDES_PREFIX}")
-    set(CMAKE_CXX_CL_SHOWINCLUDES_PREFIX "${CODEX_GLASS_SHOWINCLUDES_PREFIX}")
-    set(CMAKE_CL_SHOWINCLUDES_PREFIX "${CODEX_GLASS_SHOWINCLUDES_PREFIX}")
+    set(CMAKE_C_CL_SHOWINCLUDES_PREFIX "${CODEX_DECK_SHOWINCLUDES_PREFIX}")
+    set(CMAKE_CXX_CL_SHOWINCLUDES_PREFIX "${CODEX_DECK_SHOWINCLUDES_PREFIX}")
+    set(CMAKE_CL_SHOWINCLUDES_PREFIX "${CODEX_DECK_SHOWINCLUDES_PREFIX}")
 endif()
 
-set(CODEX_GLASS_VERSION_BUILD "1" CACHE STRING "Windows file version build number")
-set(CODEX_GLASS_VERSION_COMPANY "Codex Glass" CACHE STRING "Windows version metadata company name")
-set(CODEX_GLASS_VERSION_COPYRIGHT "Copyright (C) 2026 Codex Glass" CACHE STRING "Windows version metadata copyright")
-option(CODEX_GLASS_ENABLE_ASAN "Enable AddressSanitizer for memory corruption diagnostics" OFF)
+set(CODEX_DECK_VERSION_BUILD "1" CACHE STRING "Windows file version build number")
+set(CODEX_DECK_VERSION_COMPANY "Codex Deck" CACHE STRING "Windows version metadata company name")
+set(CODEX_DECK_VERSION_COPYRIGHT "Copyright (C) 2026 Codex Deck" CACHE STRING "Windows version metadata copyright")
+option(CODEX_DECK_ENABLE_ASAN "Enable AddressSanitizer for memory corruption diagnostics" OFF)
 
-if(NOT CODEX_GLASS_VERSION_BUILD MATCHES "^[0-9]+$")
-    message(FATAL_ERROR "CODEX_GLASS_VERSION_BUILD must be a non-negative integer")
+if(NOT CODEX_DECK_VERSION_BUILD MATCHES "^[0-9]+$")
+    message(FATAL_ERROR "CODEX_DECK_VERSION_BUILD must be a non-negative integer")
 endif()
 
-set(CODEX_GLASS_VERSION_STRING "${PROJECT_VERSION}")
-set(CODEX_GLASS_FILE_VERSION_STRING "${PROJECT_VERSION}.${CODEX_GLASS_VERSION_BUILD}")
+set(CODEX_DECK_VERSION_STRING "${PROJECT_VERSION}")
+set(CODEX_DECK_FILE_VERSION_STRING "${PROJECT_VERSION}.${CODEX_DECK_VERSION_BUILD}")
 
 configure_file(
     src/resources/VersionInfo.rc.in
@@ -81,7 +100,7 @@ target_compile_definitions(sqlite3 PRIVATE
     $<$<CONFIG:Release>:SQLITE_STRICT_SUBTYPE=1>
 )
 
-add_executable(CodexGlass WIN32
+add_executable(CodexDeck WIN32
     ${CMAKE_CURRENT_BINARY_DIR}/generated/VersionInfo.rc
     src/icon/AppIcon.cpp
     src/settings/AppSettings.cpp
@@ -91,7 +110,7 @@ add_executable(CodexGlass WIN32
     src/motion/WidgetMotionEffectsSettings.cpp
     src/motion/WidgetMotionCurves.cpp
     src/motion/WidgetMotionWaveField.cpp
-    src/resources/CodexGlass.rc
+    src/resources/CodexDeck.rc
     src/usage/UsageProviderFactory.cpp
     src/providers/codex/CodexAuthReader.cpp
     src/providers/codex/CodexUsageClient.cpp
@@ -180,27 +199,27 @@ add_executable(CodexGlass WIN32
     src/main.cpp
 )
 
-target_compile_features(CodexGlass PRIVATE cxx_std_20)
+codex_deck_enable_cpp23(CodexDeck)
 
-set_source_files_properties(src/resources/CodexGlass.rc PROPERTIES
+set_source_files_properties(src/resources/CodexDeck.rc PROPERTIES
     OBJECT_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/src/resources/ResourceIds.h;${CMAKE_CURRENT_SOURCE_DIR}/src/resources/strings.fr.rc;${CMAKE_CURRENT_SOURCE_DIR}/src/resources/strings.en.rc"
 )
 
-target_compile_definitions(CodexGlass PRIVATE
-    CODEX_GLASS_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
-    CODEX_GLASS_VERSION_MINOR=${PROJECT_VERSION_MINOR}
-    CODEX_GLASS_VERSION_PATCH=${PROJECT_VERSION_PATCH}
-    CODEX_GLASS_VERSION_BUILD=${CODEX_GLASS_VERSION_BUILD}
-    CODEX_GLASS_VERSION_STRING=L"${CODEX_GLASS_VERSION_STRING}"
-    CODEX_GLASS_FILE_VERSION_STRING=L"${CODEX_GLASS_FILE_VERSION_STRING}"
+target_compile_definitions(CodexDeck PRIVATE
+    CODEX_DECK_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    CODEX_DECK_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    CODEX_DECK_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+    CODEX_DECK_VERSION_BUILD=${CODEX_DECK_VERSION_BUILD}
+    CODEX_DECK_VERSION_STRING=L"${CODEX_DECK_VERSION_STRING}"
+    CODEX_DECK_FILE_VERSION_STRING=L"${CODEX_DECK_FILE_VERSION_STRING}"
     UNICODE
     _UNICODE
     WIN32_LEAN_AND_MEAN
     NOMINMAX
 )
 
-target_link_libraries(CodexGlass PRIVATE
+target_link_libraries(CodexDeck PRIVATE
     d2d1
     dwmapi
     dwrite
@@ -227,7 +246,7 @@ if(MSVC)
         $<$<CONFIG:Release>:/Gw>
     )
 
-    target_compile_options(CodexGlass PRIVATE
+    target_compile_options(CodexDeck PRIVATE
         /W4
         /permissive-
         /Zc:__cplusplus
@@ -237,18 +256,18 @@ if(MSVC)
     )
 
     # Elimine et fusionne le code inutilise uniquement dans l'executable livre.
-    target_link_options(CodexGlass PRIVATE
+    target_link_options(CodexDeck PRIVATE
         $<$<CONFIG:Release>:/LTCG>
         $<$<CONFIG:Release>:/OPT:REF>
         $<$<CONFIG:Release>:/OPT:ICF>
     )
 
-    if(CODEX_GLASS_ENABLE_ASAN)
-        target_compile_options(CodexGlass PRIVATE
+    if(CODEX_DECK_ENABLE_ASAN)
+        target_compile_options(CodexDeck PRIVATE
             /fsanitize=address
             /Zi
         )
-        target_link_options(CodexGlass PRIVATE
+        target_link_options(CodexDeck PRIVATE
             /fsanitize=address
             /DEBUG
         )
@@ -270,7 +289,7 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/WidgetMotionEffec
         src/vibration/WidgetVibrationGlassEffect.cpp
         src/vibration/WidgetVibrationSettings.cpp
     )
-    target_compile_features(WidgetMotionEffectsTests PRIVATE cxx_std_20)
+    codex_deck_enable_cpp23(WidgetMotionEffectsTests)
     target_include_directories(WidgetMotionEffectsTests PRIVATE src)
     target_compile_definitions(WidgetMotionEffectsTests PRIVATE
         UNICODE
@@ -292,7 +311,7 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/WidgetVibrationCo
         src/vibration/WidgetVibrationController.cpp
         src/vibration/WidgetVibrationSettings.cpp
     )
-    target_compile_features(WidgetVibrationControllerTests PRIVATE cxx_std_20)
+    codex_deck_enable_cpp23(WidgetVibrationControllerTests)
     target_include_directories(WidgetVibrationControllerTests PRIVATE src)
     target_compile_definitions(WidgetVibrationControllerTests PRIVATE
         UNICODE
@@ -323,10 +342,10 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CodexUsageTests.c
         src/tokens/TokenUsageStore.cpp
         src/tokens/TokenUsageRefreshWorker.cpp
     )
-    target_compile_features(CodexUsageTests PRIVATE cxx_std_20)
+    codex_deck_enable_cpp23(CodexUsageTests)
     target_include_directories(CodexUsageTests PRIVATE src)
     target_compile_definitions(CodexUsageTests PRIVATE
-        CODEX_GLASS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+        CODEX_DECK_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
         UNICODE
         _UNICODE
         WIN32_LEAN_AND_MEAN
@@ -347,7 +366,7 @@ endif()
 if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/WidgetUiTests.cpp")
     add_executable(WidgetUiTests
         tests/WidgetUiTests.cpp
-        src/resources/CodexGlass.rc
+        src/resources/CodexDeck.rc
         src/localization/Localization.cpp
         src/color/WidgetColorPanel.cpp
         src/color/WidgetColorTools.cpp
@@ -362,7 +381,7 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/WidgetUiTests.cpp
         src/animation/WidgetQuotaGraphAnimation.cpp
         src/animation/WidgetRollingNumberAnimation.cpp
     )
-    target_compile_features(WidgetUiTests PRIVATE cxx_std_20)
+    codex_deck_enable_cpp23(WidgetUiTests)
     target_include_directories(WidgetUiTests PRIVATE src)
     target_compile_definitions(WidgetUiTests PRIVATE
         UNICODE
@@ -382,10 +401,10 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/WindowsStartupTes
         tests/WindowsStartupTests.cpp
         src/startup/WindowsStartup.cpp
     )
-    target_compile_features(WindowsStartupTests PRIVATE cxx_std_20)
+    codex_deck_enable_cpp23(WindowsStartupTests)
     target_include_directories(WindowsStartupTests PRIVATE src)
     target_compile_definitions(WindowsStartupTests PRIVATE
-        CODEX_GLASS_STARTUP_TEST_REGISTRY
+        CODEX_DECK_STARTUP_TEST_REGISTRY
         UNICODE
         _UNICODE
         WIN32_LEAN_AND_MEAN
@@ -403,7 +422,7 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/SingleInstanceTes
         tests/SingleInstanceTests.cpp
         src/win32/SingleInstance.cpp
     )
-    target_compile_features(SingleInstanceTests PRIVATE cxx_std_20)
+    codex_deck_enable_cpp23(SingleInstanceTests)
     target_include_directories(SingleInstanceTests PRIVATE src)
     target_compile_definitions(SingleInstanceTests PRIVATE
         UNICODE

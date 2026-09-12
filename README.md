@@ -10,4 +10,22 @@
 
 Codex Deck est un client Windows natif, rapide et léger pour piloter plusieurs sessions, projets et agents Codex depuis une interface unique. Écrit en C++23 avec Win32, Direct2D, DirectWrite et DirectComposition, il organise les sessions dans un arbre compact et les ouvre dans un Workbench pensé pour suivre conversations, commandes, outils, approbations et modifications de fichiers sans dépendre d’une interface web lourde.
 
-Le projet est actuellement en phase de développement initiale et part du socle éprouvé de [Codex Glass](https://github.com/Karlos-fr/codex-glass).
+Le projet est actuellement en pré-alpha et part du socle éprouvé de [Codex Glass](https://github.com/Karlos-fr/codex-glass).
+
+## Cible
+
+- Windows 11 x64
+- C++23
+- CMake, Ninja, MSVC Build Tools
+
+## Build
+
+```powershell
+cmake --preset debug
+cmake --build --preset debug
+ctest --preset debug --output-on-failure
+
+cmake --preset release
+cmake --build --preset release
+ctest --preset release --output-on-failure
+```
