@@ -7,6 +7,8 @@
 
 #include "DeckRenderer.h"
 
+#include "../navigation/ActivityBarModel.h"
+#include "../navigation/ActivityBarView.h"
 #include "../navigation/ProjectTreeModel.h"
 #include "../navigation/TreeHitTesting.h"
 #include "../navigation/ProjectTreeView.h"
@@ -45,6 +47,9 @@ struct DeckRenderer::Impl {
     // Vue Tree virtualisee.
     ProjectTreeView tree_view;
 
+    // Vue de barre d'activite.
+    ActivityBarView activity_bar_view;
+
     // Lignes synthetiques de debug pour valider le rendu volumineux.
     std::vector<TreeRow> debug_tree_rows;
 
@@ -56,6 +61,9 @@ struct DeckRenderer::Impl {
 
     // Etat de deploiement synthetique.
     ProjectTreeState tree_state;
+
+    // Filtre global courant.
+    SessionFilter active_filter = SessionFilter::All;
 
     // Ligne selectionnee au clavier.
     std::size_t selected_tree_row = 0;
@@ -88,6 +96,9 @@ constexpr float kDeckSubtitleHeight = 28.0F;
 
 // Largeur initiale du Tree en DIPs.
 constexpr float kTreeDebugWidth = 300.0F;
+
+// Hauteur compacte de la barre d'activite.
+constexpr float kActivityBarHeight = 42.0F;
 
 // DPI Win32 standard utilise en repli.
 constexpr float kDefaultDpi = 96.0F;
@@ -175,13 +186,51 @@ void ActivateTreeRow(ProjectTreeState& state, const TreeRow& row) {
     }
 }
 
+// ----------------------------------------------------------------------------
+// Bascule un filtre global.
+//
+// Parametres :
+// - current : filtre courant.
+// - requested : filtre demande.
+//
+// Retour :
+// - All si le filtre etait deja actif, sinon le filtre demande.
+// ----------------------------------------------------------------------------
+SessionFilter ToggleFilter(SessionFilter current, SessionFilter requested) {
+    return current == requested ? SessionFilter::All : requested;
+}
+
+// ----------------------------------------------------------------------------
+// Traduit une position horizontale de barre en filtre.
+//
+// Parametres :
+// - x : position horizontale en DIPs.
+//
+// Retour :
+// - filtre clique.
+// ----------------------------------------------------------------------------
+std::optional<SessionFilter> ActivityFilterAt(float x) {
+    if (x < 120.0F) {
+        return SessionFilter::Working;
+    }
+    if (x < 250.0F) {
+        return SessionFilter::NeedsAttention;
+    }
+    if (x < 430.0F) {
+        return SessionFilter::CompletedToday;
+    }
+    return std::nullopt;
+}
+
 }  // namespace
 
 // ----------------------------------------------------------------------------
 // Reconstruit les lignes synthetiques depuis l'etat courant.
 // ----------------------------------------------------------------------------
 void DeckRenderer::Impl::RebuildDebugRows() {
-    debug_tree_rows = BuildProjectTreeRows(debug_catalog, tree_state);
+    SessionCatalogSnapshot visible_catalog = debug_catalog;
+    visible_catalog.sessions = FilterSessions(debug_catalog.sessions, active_filter);
+    debug_tree_rows = BuildProjectTreeRows(visible_catalog, tree_state);
     if (!debug_tree_rows.empty() && selected_tree_row >= debug_tree_rows.size()) {
         selected_tree_row = debug_tree_rows.size() - 1;
     }
@@ -294,11 +343,20 @@ void DeckRenderer::Render(HWND hwnd, const DeckVisualState& state, const ThemePa
     context->Clear(palette.window_background);
     context->FillRectangle(D2D1::RectF(0.0F, 0.0F, size.width, size.height), impl_->background_brush.Get());
     impl_->tree_scroll.viewport_extent = size.height;
+    impl_->tree_scroll.viewport_extent = std::max(0.0F, size.height - kActivityBarHeight);
     impl_->tree_scroll.content_extent = static_cast<float>(impl_->debug_tree_rows.size()) * impl_->tree_view.RowHeight();
     impl_->tree_scroll.Clamp();
+    const ActivityCounts counts = BuildActivityCounts(impl_->debug_catalog.sessions);
+    impl_->activity_bar_view.Render(
+        context,
+        D2D1::RectF(0.0F, 0.0F, size.width, kActivityBarHeight),
+        counts,
+        impl_->active_filter,
+        palette
+    );
     impl_->tree_view.Render(
         context,
-        D2D1::RectF(0.0F, 0.0F, std::min(kTreeDebugWidth, size.width), size.height),
+        D2D1::RectF(0.0F, kActivityBarHeight, std::min(kTreeDebugWidth, size.width), size.height),
         impl_->debug_tree_rows,
         impl_->tree_scroll,
         palette
@@ -341,7 +399,17 @@ void DeckRenderer::OnPointerDown(float x, float y) {
     if (impl_ == nullptr || impl_->debug_tree_rows.empty()) {
         return;
     }
-    const D2D1_RECT_F tree_bounds = D2D1::RectF(0.0F, 0.0F, kTreeDebugWidth, impl_->tree_scroll.viewport_extent);
+    if (y < kActivityBarHeight) {
+        if (const auto filter = ActivityFilterAt(x)) {
+            impl_->active_filter = ToggleFilter(impl_->active_filter, *filter);
+            impl_->selected_tree_row = 0;
+            impl_->tree_scroll.offset = 0.0F;
+            impl_->RebuildDebugRows();
+        }
+        return;
+    }
+
+    const D2D1_RECT_F tree_bounds = D2D1::RectF(0.0F, kActivityBarHeight, kTreeDebugWidth, kActivityBarHeight + impl_->tree_scroll.viewport_extent);
     const auto hit = HitTestTreeRow(D2D1::Point2F(x, y), tree_bounds, impl_->tree_scroll, impl_->tree_view.RowHeight(), impl_->debug_tree_rows.size());
     if (!hit) {
         return;

@@ -120,6 +120,8 @@ add_executable(CodexDeck WIN32
     src/main.cpp
     src/model/ActivityOrdering.cpp
     src/model/SessionCatalog.cpp
+    src/navigation/ActivityBarModel.cpp
+    src/navigation/ActivityBarView.cpp
     src/navigation/ProjectTreeModel.cpp
     src/navigation/ProjectTreeView.cpp
     src/navigation/TreeHitTesting.cpp
@@ -637,4 +639,16 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/navigation/TreeHi
     target_include_directories(TreeHitTestingTests PRIVATE src)
     target_link_libraries(TreeHitTestingTests PRIVATE d2d1)
     add_test(NAME TreeHitTestingTests COMMAND TreeHitTestingTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/navigation/ActivityBarModelTests.cpp")
+    add_executable(ActivityBarModelTests
+        tests/navigation/ActivityBarModelTests.cpp
+        src/navigation/ActivityBarModel.cpp
+    )
+    codex_deck_enable_cpp23(ActivityBarModelTests)
+    codex_deck_enable_msvc_defaults(ActivityBarModelTests)
+    target_include_directories(ActivityBarModelTests PRIVATE src)
+    target_link_libraries(ActivityBarModelTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME ActivityBarModelTests COMMAND ActivityBarModelTests)
 endif()

@@ -214,15 +214,15 @@ git commit -m "feat: render virtualized project tree"
 - Produces: `ActivityCounts BuildActivityCounts(span<SessionRecord>)`.
 - Produces: `enum class SessionFilter { All, Working, NeedsAttention, CompletedToday, Favorites, Archived };`.
 
-- [ ] **Step 1: Tester les compteurs**
+- [x] **Step 1: Tester les compteurs**
 
 Construire 6 sessions avec états variés et vérifier exactement `working`, `needs_attention`, `completed_today`.
 
-- [ ] **Step 2: Implémenter modèle et filtre**
+- [x] **Step 2: Implémenter modèle et filtre**
 
 `Favorites` s’appuie sur métadonnée locale. `Archived` s’appuie sur les threads archivés retournés/lus par Codex ; ne pas marquer localement une conversation comme archivée sans succès `thread/archive`.
 
-- [ ] **Step 3: Rendre la barre**
+- [x] **Step 3: Rendre la barre**
 
 Disposition compacte en haut :
 
@@ -232,7 +232,7 @@ Disposition compacte en haut :
 
 Cliquer sur un compteur active/désactive le filtre correspondant puis reconstruit les `TreeRow` sans modifier le catalogue source.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/navigation tests/navigation
