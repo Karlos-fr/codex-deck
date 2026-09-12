@@ -257,15 +257,15 @@ git commit -m "feat: add live activity filters"
 - Produces: `FuzzyMatch(query, candidate) -> optional<FuzzyScore>`.
 - Produces: `PaletteEntry {kind,id,title,subtitle,score,command}`.
 
-- [ ] **Step 1: Écrire les tests de scoring**
+- [x] **Step 1: Écrire les tests de scoring**
 
 `"spa aud"` doit classer `SpotifyAmp / Audio parity` devant `OpenRemi / Audio notes`. Les correspondances préfixes de mot et séquences contiguës reçoivent un bonus ; les trous longs une pénalité.
 
-- [ ] **Step 2: Implémenter matcher sans dépendance**
+- [x] **Step 2: Implémenter matcher sans dépendance**
 
 Algorithme déterministe sur chaînes Unicode déjà normalisées en minuscules ; pas de bibliothèque fuzzy tierce.
 
-- [ ] **Step 3: Définir les commandes applicatives**
+- [x] **Step 3: Définir les commandes applicatives**
 
 Créer `src/app/DeckCommand.h` :
 
@@ -288,15 +288,15 @@ struct DeckCommand {
 };
 ```
 
-- [ ] **Step 4: Construire les entrées palette**
+- [x] **Step 4: Construire les entrées palette**
 
 Entrées groupées `SESSIONS`, `PROJECTS`, `ACTIONS`; maximum 50 résultats affichés, mais score calculé sur tout le snapshot sur worker si le volume dépasse 2 000 entrées.
 
-- [ ] **Step 5: Rendre l’overlay via DirectComposition**
+- [x] **Step 5: Rendre l’overlay via DirectComposition**
 
 La palette est une surface/visual indépendante avec apparition 150 ms maximum, input focus capturé, Esc pour fermer, Up/Down/Enter pour sélectionner.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/search src/navigation src/app tests

@@ -99,6 +99,17 @@ public:
     bool OnKeyDown(WPARAM virtual_key);
 
     // ------------------------------------------------------------------------
+    // Traite un caractere texte pour la Command Palette.
+    //
+    // Parametres :
+    // - character : caractere UTF-16 issu de WM_CHAR.
+    //
+    // Retour :
+    // - true si le caractere a ete consomme.
+    // ------------------------------------------------------------------------
+    bool OnChar(wchar_t character);
+
+    // ------------------------------------------------------------------------
     // Libere les ressources graphiques dependantes du device.
     // ------------------------------------------------------------------------
     void DiscardDeviceResources();

@@ -9,6 +9,8 @@
 
 #include "../navigation/ActivityBarModel.h"
 #include "../navigation/ActivityBarView.h"
+#include "../navigation/CommandPaletteModel.h"
+#include "../navigation/CommandPaletteView.h"
 #include "../navigation/ProjectTreeModel.h"
 #include "../navigation/TreeHitTesting.h"
 #include "../navigation/ProjectTreeView.h"
@@ -19,6 +21,7 @@
 
 #include <algorithm>
 #include <string>
+#include <cwctype>
 
 using Microsoft::WRL::ComPtr;
 
@@ -50,6 +53,9 @@ struct DeckRenderer::Impl {
     // Vue de barre d'activite.
     ActivityBarView activity_bar_view;
 
+    // Vue de Command Palette.
+    CommandPaletteView command_palette_view;
+
     // Lignes synthetiques de debug pour valider le rendu volumineux.
     std::vector<TreeRow> debug_tree_rows;
 
@@ -68,10 +74,27 @@ struct DeckRenderer::Impl {
     // Ligne selectionnee au clavier.
     std::size_t selected_tree_row = 0;
 
+    // Indique si la Command Palette capture actuellement le clavier.
+    bool command_palette_open = false;
+
+    // Requete courante de la Command Palette.
+    std::wstring command_palette_query;
+
+    // Entrees scorees visibles dans la Command Palette.
+    std::vector<PaletteEntry> command_palette_entries;
+
+    // Entree de palette selectionnee.
+    std::size_t command_palette_selection = 0;
+
     // ------------------------------------------------------------------------
     // Reconstruit les lignes synthetiques depuis l'etat courant.
     // ------------------------------------------------------------------------
     void RebuildDebugRows();
+
+    // ------------------------------------------------------------------------
+    // Reconstruit les entrees de Command Palette depuis la requete courante.
+    // ------------------------------------------------------------------------
+    void RebuildCommandPalette();
 };
 
 namespace {
@@ -222,6 +245,16 @@ std::optional<SessionFilter> ActivityFilterAt(float x) {
     return std::nullopt;
 }
 
+// ----------------------------------------------------------------------------
+// Indique si Ctrl est actuellement enfonce.
+//
+// Retour :
+// - true lorsque la touche Ctrl gauche ou droite est active.
+// ----------------------------------------------------------------------------
+bool IsControlDown() {
+    return (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+}
+
 }  // namespace
 
 // ----------------------------------------------------------------------------
@@ -233,6 +266,18 @@ void DeckRenderer::Impl::RebuildDebugRows() {
     debug_tree_rows = BuildProjectTreeRows(visible_catalog, tree_state);
     if (!debug_tree_rows.empty() && selected_tree_row >= debug_tree_rows.size()) {
         selected_tree_row = debug_tree_rows.size() - 1;
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Reconstruit les entrees de Command Palette depuis la requete courante.
+// ----------------------------------------------------------------------------
+void DeckRenderer::Impl::RebuildCommandPalette() {
+    command_palette_entries = BuildCommandPaletteEntries(debug_catalog, command_palette_query);
+    if (!command_palette_entries.empty() && command_palette_selection >= command_palette_entries.size()) {
+        command_palette_selection = command_palette_entries.size() - 1;
+    } else if (command_palette_entries.empty()) {
+        command_palette_selection = 0;
     }
 }
 
@@ -375,6 +420,16 @@ void DeckRenderer::Render(HWND hwnd, const DeckVisualState& state, const ThemePa
         D2D1::RectF(kTreeDebugWidth + kDeckContentLeft, kDeckContentTop + kDeckTitleHeight, size.width - kDeckContentLeft, kDeckContentTop + kDeckTitleHeight + kDeckSubtitleHeight),
         impl_->subtitle_brush.Get()
     );
+    if (impl_->command_palette_open) {
+        impl_->command_palette_view.Render(
+            context,
+            D2D1::RectF(0.0F, 0.0F, size.width, size.height),
+            impl_->command_palette_query,
+            impl_->command_palette_entries,
+            impl_->command_palette_selection,
+            palette
+        );
+    }
     if (!impl_->composition.EndDraw().has_value()) {
         DiscardDeviceResources();
     }
@@ -428,6 +483,43 @@ bool DeckRenderer::OnKeyDown(WPARAM virtual_key) {
         return false;
     }
 
+    if (IsControlDown() && virtual_key == 'K') {
+        impl_->command_palette_open = true;
+        impl_->command_palette_query.clear();
+        impl_->command_palette_selection = 0;
+        impl_->RebuildCommandPalette();
+        return true;
+    }
+
+    if (impl_->command_palette_open) {
+        switch (virtual_key) {
+        case VK_ESCAPE:
+            impl_->command_palette_open = false;
+            return true;
+        case VK_UP:
+            if (impl_->command_palette_selection > 0) {
+                --impl_->command_palette_selection;
+            }
+            return true;
+        case VK_DOWN:
+            if (impl_->command_palette_selection + 1 < impl_->command_palette_entries.size()) {
+                ++impl_->command_palette_selection;
+            }
+            return true;
+        case VK_BACK:
+            if (!impl_->command_palette_query.empty()) {
+                impl_->command_palette_query.pop_back();
+                impl_->RebuildCommandPalette();
+            }
+            return true;
+        case VK_RETURN:
+            impl_->command_palette_open = false;
+            return true;
+        default:
+            return true;
+        }
+    }
+
     switch (virtual_key) {
     case VK_UP:
         if (impl_->selected_tree_row > 0) {
@@ -459,6 +551,24 @@ bool DeckRenderer::OnKeyDown(WPARAM virtual_key) {
     default:
         return false;
     }
+}
+
+// ----------------------------------------------------------------------------
+// Traite un caractere texte pour la Command Palette.
+// ----------------------------------------------------------------------------
+bool DeckRenderer::OnChar(wchar_t character) {
+    if (impl_ == nullptr || !impl_->command_palette_open) {
+        return false;
+    }
+    if (character == L'\b' || character == L'\r' || character == L'\n' || character == L'\t') {
+        return true;
+    }
+    if (std::iswcntrl(character) != 0) {
+        return true;
+    }
+    impl_->command_palette_query.push_back(character);
+    impl_->RebuildCommandPalette();
+    return true;
 }
 
 // ----------------------------------------------------------------------------

@@ -106,6 +106,12 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
             return 0;
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
+    case WM_CHAR:
+        if (renderer_.OnChar(static_cast<wchar_t>(wparam))) {
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_GETMINMAXINFO: {
         const SIZE minimum = DeckMinimumClientSize();
         auto* info = reinterpret_cast<MINMAXINFO*>(lparam);

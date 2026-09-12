@@ -122,6 +122,8 @@ add_executable(CodexDeck WIN32
     src/model/SessionCatalog.cpp
     src/navigation/ActivityBarModel.cpp
     src/navigation/ActivityBarView.cpp
+    src/navigation/CommandPaletteModel.cpp
+    src/navigation/CommandPaletteView.cpp
     src/navigation/ProjectTreeModel.cpp
     src/navigation/ProjectTreeView.cpp
     src/navigation/TreeHitTesting.cpp
@@ -136,6 +138,7 @@ add_executable(CodexDeck WIN32
     src/storage/SessionMetadataRepository.cpp
     src/storage/SqliteDatabase.cpp
     src/sync/SessionSyncService.cpp
+    src/search/FuzzyMatcher.cpp
     src/ui/ScrollState.cpp
     src/ui/VirtualListLayout.cpp
     src/theme/Theme.cpp
@@ -651,4 +654,28 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/navigation/Activi
     target_include_directories(ActivityBarModelTests PRIVATE src)
     target_link_libraries(ActivityBarModelTests PRIVATE nlohmann_json::nlohmann_json)
     add_test(NAME ActivityBarModelTests COMMAND ActivityBarModelTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/search/FuzzyMatcherTests.cpp")
+    add_executable(FuzzyMatcherTests
+        tests/search/FuzzyMatcherTests.cpp
+        src/search/FuzzyMatcher.cpp
+    )
+    codex_deck_enable_cpp23(FuzzyMatcherTests)
+    codex_deck_enable_msvc_defaults(FuzzyMatcherTests)
+    target_include_directories(FuzzyMatcherTests PRIVATE src)
+    add_test(NAME FuzzyMatcherTests COMMAND FuzzyMatcherTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/navigation/CommandPaletteModelTests.cpp")
+    add_executable(CommandPaletteModelTests
+        tests/navigation/CommandPaletteModelTests.cpp
+        src/navigation/CommandPaletteModel.cpp
+        src/search/FuzzyMatcher.cpp
+    )
+    codex_deck_enable_cpp23(CommandPaletteModelTests)
+    codex_deck_enable_msvc_defaults(CommandPaletteModelTests)
+    target_include_directories(CommandPaletteModelTests PRIVATE src)
+    target_link_libraries(CommandPaletteModelTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME CommandPaletteModelTests COMMAND CommandPaletteModelTests)
 endif()
