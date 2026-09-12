@@ -141,6 +141,7 @@ add_executable(CodexDeck WIN32
     src/storage/SqliteDatabase.cpp
     src/sync/SessionSyncService.cpp
     src/search/FuzzyMatcher.cpp
+    src/ui/MainLayout.cpp
     src/ui/ScrollState.cpp
     src/ui/VirtualListLayout.cpp
     src/theme/Theme.cpp
@@ -710,4 +711,15 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/navigation/TreeDr
     target_include_directories(TreeDragControllerTests PRIVATE src)
     target_link_libraries(TreeDragControllerTests PRIVATE nlohmann_json::nlohmann_json)
     add_test(NAME TreeDragControllerTests COMMAND TreeDragControllerTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/MainLayoutTests.cpp")
+    add_executable(MainLayoutTests
+        tests/ui/MainLayoutTests.cpp
+        src/ui/MainLayout.cpp
+    )
+    codex_deck_enable_cpp23(MainLayoutTests)
+    codex_deck_enable_msvc_defaults(MainLayoutTests)
+    target_include_directories(MainLayoutTests PRIVATE src)
+    add_test(NAME MainLayoutTests COMMAND MainLayoutTests)
 endif()

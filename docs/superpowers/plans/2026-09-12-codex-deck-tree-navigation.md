@@ -376,19 +376,19 @@ tant qu'un bus de commandes UI -> worker n'est pas disponible.
 **Interfaces:**
 - Produces: `MainLayoutRects ComputeMainLayout(SizeF client, float tree_width, float activity_height, float composer_height)`.
 
-- [ ] **Step 1: Tester le layout**
+- [x] **Step 1: Tester le layout**
 
 À `1440x900`, tree width `300`, activity bar `42`, vérifier zéro chevauchement et workbench width `1140`.
 
-- [ ] **Step 2: Implémenter séparateur redimensionnable**
+- [x] **Step 2: Implémenter séparateur redimensionnable**
 
 Tree width bornée `[220, 480]` DIPs. Le splitter fait 4 DIPs avec zone de hit 8 DIPs. Persistante seulement dans le plan de hardening ; pour l’instant état mémoire.
 
-- [ ] **Step 3: Rendre la structure finale de navigation**
+- [x] **Step 3: Rendre la structure finale de navigation**
 
 La zone droite affiche un Workbench placeholder indiquant session sélectionnée ou `Select a session`. Le vrai Workbench arrive au plan suivant.
 
-- [ ] **Step 4: Validation complète**
+- [x] **Step 4: Validation complète**
 
 ```powershell
 cmake --preset debug
@@ -401,7 +401,7 @@ ctest --preset release --output-on-failure
 
 Tester clavier seul, recherche, palette, rename, archive, drag vers projet, 10 000 sessions synthétiques.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ui src/navigation src/rendering src/app tests

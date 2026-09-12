@@ -16,6 +16,7 @@
 #include "../navigation/TreeHitTesting.h"
 #include "../navigation/ProjectTreeView.h"
 #include "../navigation/TreeDragController.h"
+#include "../ui/MainLayout.h"
 #include "../ui/ScrollState.h"
 
 #include <dwrite.h>
@@ -91,6 +92,12 @@ struct DeckRenderer::Impl {
     // Entree de palette selectionnee.
     std::size_t command_palette_selection = 0;
 
+    // Largeur courante du Tree.
+    float tree_width = 300.0F;
+
+    // Indique qu'un redimensionnement de Tree est en cours.
+    bool resizing_tree = false;
+
     // Indique qu'un renommage inline synthetique est en cours.
     bool rename_active = false;
 
@@ -142,11 +149,14 @@ constexpr float kDeckTitleHeight = 46.0F;
 // Hauteur reservee au sous-titre en DIPs.
 constexpr float kDeckSubtitleHeight = 28.0F;
 
-// Largeur initiale du Tree en DIPs.
-constexpr float kTreeDebugWidth = 300.0F;
-
 // Hauteur compacte de la barre d'activite.
 constexpr float kActivityBarHeight = 42.0F;
+
+// Hauteur reservee au composer futur.
+constexpr float kComposerPlaceholderHeight = 120.0F;
+
+// Largeur de zone de hit du separateur.
+constexpr float kSplitterHitWidth = 8.0F;
 
 // DPI Win32 standard utilise en repli.
 constexpr float kDefaultDpi = 96.0F;
@@ -288,6 +298,33 @@ bool IsControlDown() {
 // ----------------------------------------------------------------------------
 bool IsShiftDown() {
     return (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+}
+
+// ----------------------------------------------------------------------------
+// Convertit un rectangle de layout vers Direct2D.
+//
+// Parametres :
+// - rect : rectangle generique.
+//
+// Retour :
+// - rectangle Direct2D.
+// ----------------------------------------------------------------------------
+D2D1_RECT_F ToD2DRect(const LayoutRect& rect) {
+    return D2D1::RectF(rect.left, rect.top, rect.right, rect.bottom);
+}
+
+// ----------------------------------------------------------------------------
+// Calcule si une position est sur la zone de redimensionnement.
+//
+// Parametres :
+// - x : position horizontale.
+// - tree_width : largeur courante.
+//
+// Retour :
+// - true si le pointeur touche le separateur.
+// ----------------------------------------------------------------------------
+bool IsSplitterHit(float x, float tree_width) {
+    return std::abs(x - tree_width) <= kSplitterHitWidth * 0.5F;
 }
 
 // ----------------------------------------------------------------------------
@@ -473,6 +510,13 @@ void DeckRenderer::Render(HWND hwnd, const DeckVisualState& state, const ThemePa
     }
 
     const D2D1_SIZE_F size = context->GetSize();
+    const MainLayoutRects layout = ComputeMainLayout(
+        SizeF{size.width, size.height},
+        impl_->tree_width,
+        kActivityBarHeight,
+        kComposerPlaceholderHeight
+    );
+    impl_->tree_width = layout.tree.right - layout.tree.left;
     if (impl_->debug_tree_rows.empty()) {
         constexpr int kProjectCount = 500;
         for (int project_index = 0; project_index < kProjectCount; ++project_index) {
@@ -486,37 +530,40 @@ void DeckRenderer::Render(HWND hwnd, const DeckVisualState& state, const ThemePa
     impl_->subtitle_brush->SetColor(palette.text_muted);
     context->Clear(palette.window_background);
     context->FillRectangle(D2D1::RectF(0.0F, 0.0F, size.width, size.height), impl_->background_brush.Get());
-    impl_->tree_scroll.viewport_extent = size.height;
-    impl_->tree_scroll.viewport_extent = std::max(0.0F, size.height - kActivityBarHeight);
+    impl_->tree_scroll.viewport_extent = std::max(0.0F, layout.tree.bottom - layout.tree.top);
     impl_->tree_scroll.content_extent = static_cast<float>(impl_->debug_tree_rows.size()) * impl_->tree_view.RowHeight();
     impl_->tree_scroll.Clamp();
     const ActivityCounts counts = BuildActivityCounts(impl_->debug_catalog.sessions);
     impl_->activity_bar_view.Render(
         context,
-        D2D1::RectF(0.0F, 0.0F, size.width, kActivityBarHeight),
+        ToD2DRect(layout.activity_bar),
         counts,
         impl_->active_filter,
         palette
     );
     impl_->tree_view.Render(
         context,
-        D2D1::RectF(0.0F, kActivityBarHeight, std::min(kTreeDebugWidth, size.width), size.height),
+        ToD2DRect(layout.tree),
         impl_->debug_tree_rows,
         impl_->tree_scroll,
         palette
     );
+    context->FillRectangle(ToD2DRect(layout.splitter), impl_->subtitle_brush.Get());
+    const std::wstring workbench_title = impl_->tree_state.selected_thread
+        ? L"Session: " + std::wstring(impl_->tree_state.selected_thread->begin(), impl_->tree_state.selected_thread->end())
+        : L"Select a session";
     context->DrawTextW(
-        state.title.c_str(),
-        static_cast<UINT32>(state.title.size()),
+        workbench_title.c_str(),
+        static_cast<UINT32>(workbench_title.size()),
         impl_->title_format.Get(),
-        D2D1::RectF(kTreeDebugWidth + kDeckContentLeft, kDeckContentTop, size.width - kDeckContentLeft, kDeckContentTop + kDeckTitleHeight),
+        D2D1::RectF(layout.workbench.left + kDeckContentLeft, kDeckContentTop, layout.workbench.right - kDeckContentLeft, kDeckContentTop + kDeckTitleHeight),
         impl_->title_brush.Get()
     );
     context->DrawTextW(
         state.subtitle.c_str(),
         static_cast<UINT32>(state.subtitle.size()),
         impl_->subtitle_format.Get(),
-        D2D1::RectF(kTreeDebugWidth + kDeckContentLeft, kDeckContentTop + kDeckTitleHeight, size.width - kDeckContentLeft, kDeckContentTop + kDeckTitleHeight + kDeckSubtitleHeight),
+        D2D1::RectF(layout.workbench.left + kDeckContentLeft, kDeckContentTop + kDeckTitleHeight, layout.workbench.right - kDeckContentLeft, kDeckContentTop + kDeckTitleHeight + kDeckSubtitleHeight),
         impl_->subtitle_brush.Get()
     );
     if (impl_->command_palette_open) {
@@ -562,8 +609,13 @@ void DeckRenderer::OnPointerDown(float x, float y) {
         }
         return;
     }
+    if (IsSplitterHit(x, impl_->tree_width)) {
+        impl_->resizing_tree = true;
+        impl_->tree_drag.Cancel();
+        return;
+    }
 
-    const D2D1_RECT_F tree_bounds = D2D1::RectF(0.0F, kActivityBarHeight, kTreeDebugWidth, kActivityBarHeight + impl_->tree_scroll.viewport_extent);
+    const D2D1_RECT_F tree_bounds = D2D1::RectF(0.0F, kActivityBarHeight, impl_->tree_width, kActivityBarHeight + impl_->tree_scroll.viewport_extent);
     const auto hit = HitTestTreeRow(D2D1::Point2F(x, y), tree_bounds, impl_->tree_scroll, impl_->tree_view.RowHeight(), impl_->debug_tree_rows.size());
     if (!hit) {
         return;
@@ -582,7 +634,11 @@ void DeckRenderer::OnPointerMove(float x, float y) {
     if (impl_ == nullptr || impl_->debug_tree_rows.empty()) {
         return;
     }
-    const D2D1_RECT_F tree_bounds = D2D1::RectF(0.0F, kActivityBarHeight, kTreeDebugWidth, kActivityBarHeight + impl_->tree_scroll.viewport_extent);
+    if (impl_->resizing_tree) {
+        impl_->tree_width = ClampTreeWidth(x);
+        return;
+    }
+    const D2D1_RECT_F tree_bounds = D2D1::RectF(0.0F, kActivityBarHeight, impl_->tree_width, kActivityBarHeight + impl_->tree_scroll.viewport_extent);
     const auto hit = HitTestTreeRow(D2D1::Point2F(x, y), tree_bounds, impl_->tree_scroll, impl_->tree_view.RowHeight(), impl_->debug_tree_rows.size());
     const TreeRow* target = hit ? &impl_->debug_tree_rows[*hit] : nullptr;
     impl_->tree_drag.Update(TreeDragPoint{x, y}, target);
@@ -596,6 +652,7 @@ void DeckRenderer::OnPointerUp(float x, float y) {
         return;
     }
     OnPointerMove(x, y);
+    impl_->resizing_tree = false;
     const auto assignment = impl_->tree_drag.Drop();
     if (!assignment) {
         return;
