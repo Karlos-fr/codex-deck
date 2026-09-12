@@ -7,8 +7,11 @@
 
 #pragma once
 
+#include "../graphics/CompositionHost.h"
+
 #include <windows.h>
 
+#include <memory>
 #include <string>
 
 // ----------------------------------------------------------------------------
@@ -27,6 +30,16 @@ struct DeckVisualState {
 // ----------------------------------------------------------------------------
 class DeckRenderer {
 public:
+    // ------------------------------------------------------------------------
+    // Cree un renderer sans allouer encore de ressources natives.
+    // ------------------------------------------------------------------------
+    DeckRenderer();
+
+    // ------------------------------------------------------------------------
+    // Libere les ressources de rendu opaques.
+    // ------------------------------------------------------------------------
+    ~DeckRenderer();
+
     // ------------------------------------------------------------------------
     // Initialise les factories et les ressources liees a la fenetre.
     //
@@ -62,5 +75,5 @@ public:
 
 private:
     struct Impl;
-    Impl* impl_ = nullptr;
+    std::unique_ptr<Impl> impl_;
 };

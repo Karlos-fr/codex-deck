@@ -17,6 +17,11 @@
 class DeckApp {
 public:
     // ------------------------------------------------------------------------
+    // Libere les ressources applicatives possedees.
+    // ------------------------------------------------------------------------
+    ~DeckApp();
+
+    // ------------------------------------------------------------------------
     // Lance la boucle de messages de l'application.
     //
     // Parametres :

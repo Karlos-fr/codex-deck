@@ -1,29 +1,25 @@
 // ============================================================================
-// Codex Deck - Implementation du rendu Direct2D minimal
+// Codex Deck - Implementation du rendu DirectComposition minimal
 // ----------------------------------------------------------------------------
-// Ce fichier cree un render target HWND temporaire pour le bootstrap. Le plan
-// DirectComposition remplacera cette cible sans toucher a DeckApp.
+// Ce fichier dessine la coquille visuelle avec Direct2D sur la surface fournie
+// par CompositionHost. Il ne gere ni fenetre, ni protocole Codex, ni stockage.
 // ============================================================================
 
 #include "DeckRenderer.h"
 
-#include <d2d1.h>
 #include <dwrite.h>
 #include <wrl/client.h>
 
-#include <memory>
+#include <algorithm>
 
 using Microsoft::WRL::ComPtr;
 
 struct DeckRenderer::Impl {
-    // Factory Direct2D partagee par les ressources de rendu.
-    ComPtr<ID2D1Factory> d2d_factory;
+    // Hote DirectComposition proprietaire de la surface de dessin.
+    CompositionHost composition;
 
     // Factory DirectWrite utilisee pour les formats de texte.
     ComPtr<IDWriteFactory> dwrite_factory;
-
-    // Cible HWND Direct2D du bootstrap.
-    ComPtr<ID2D1HwndRenderTarget> render_target;
 
     // Brosse du fond principal.
     ComPtr<ID2D1SolidColorBrush> background_brush;
@@ -61,6 +57,9 @@ constexpr float kDeckTitleHeight = 46.0F;
 // Hauteur reservee au sous-titre en DIPs.
 constexpr float kDeckSubtitleHeight = 28.0F;
 
+// DPI Win32 standard utilise en repli.
+constexpr float kDefaultDpi = 96.0F;
+
 // ----------------------------------------------------------------------------
 // Retourne la taille cliente de la fenetre cible.
 //
@@ -68,61 +67,60 @@ constexpr float kDeckSubtitleHeight = 28.0F;
 // - hwnd : fenetre a mesurer.
 //
 // Retour :
-// - taille Direct2D en pixels.
+// - taille en pixels, bornee a un pixel par axe.
 // ----------------------------------------------------------------------------
 D2D1_SIZE_U ClientPixelSize(HWND hwnd) {
     RECT client{};
     GetClientRect(hwnd, &client);
     return D2D1::SizeU(
-        static_cast<UINT32>(std::max<LONG>(0, client.right - client.left)),
-        static_cast<UINT32>(std::max<LONG>(0, client.bottom - client.top))
+        static_cast<UINT32>(std::max<LONG>(1, client.right - client.left)),
+        static_cast<UINT32>(std::max<LONG>(1, client.bottom - client.top))
     );
 }
 
+// ----------------------------------------------------------------------------
+// Retourne le DPI courant de la fenetre.
+//
+// Parametres :
+// - hwnd : fenetre Win32 cible.
+//
+// Retour :
+// - DPI positif en points par pouce.
+// ----------------------------------------------------------------------------
+float WindowDpi(HWND hwnd) {
+    const UINT dpi = GetDpiForWindow(hwnd);
+    return dpi == 0 ? kDefaultDpi : static_cast<float>(dpi);
+}
+
 }  // namespace
+
+// ----------------------------------------------------------------------------
+// Cree un renderer sans allouer encore de ressources natives.
+// ----------------------------------------------------------------------------
+DeckRenderer::DeckRenderer() = default;
+
+// ----------------------------------------------------------------------------
+// Libere les ressources de rendu opaques.
+// ----------------------------------------------------------------------------
+DeckRenderer::~DeckRenderer() = default;
 
 // ----------------------------------------------------------------------------
 // Initialise les factories et les ressources liees a la fenetre.
 // ----------------------------------------------------------------------------
 bool DeckRenderer::Initialize(HWND hwnd) {
     if (impl_ == nullptr) {
-        impl_ = new Impl();
+        impl_ = std::make_unique<Impl>();
     }
-    if (!impl_->d2d_factory && FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, impl_->d2d_factory.GetAddressOf()))) {
+    if (!impl_->composition.Initialize(hwnd).has_value()) {
         return false;
     }
+    Resize(hwnd);
     if (!impl_->dwrite_factory && FAILED(DWriteCreateFactory(
             DWRITE_FACTORY_TYPE_SHARED,
             __uuidof(IDWriteFactory),
             reinterpret_cast<IUnknown**>(impl_->dwrite_factory.GetAddressOf())
         ))) {
         return false;
-    }
-    if (!impl_->render_target) {
-        const D2D1_SIZE_U size = ClientPixelSize(hwnd);
-        const D2D1_RENDER_TARGET_PROPERTIES target_properties = D2D1::RenderTargetProperties();
-        const D2D1_HWND_RENDER_TARGET_PROPERTIES hwnd_properties = D2D1::HwndRenderTargetProperties(hwnd, size);
-        if (FAILED(impl_->d2d_factory->CreateHwndRenderTarget(
-                target_properties,
-                hwnd_properties,
-                impl_->render_target.GetAddressOf()
-            ))) {
-            return false;
-        }
-    }
-    if (!impl_->background_brush) {
-        impl_->render_target->CreateSolidColorBrush(
-            D2D1::ColorF(0.07F, 0.08F, 0.10F, 1.0F),
-            impl_->background_brush.GetAddressOf()
-        );
-        impl_->render_target->CreateSolidColorBrush(
-            D2D1::ColorF(0.92F, 0.95F, 0.98F, 1.0F),
-            impl_->title_brush.GetAddressOf()
-        );
-        impl_->render_target->CreateSolidColorBrush(
-            D2D1::ColorF(0.56F, 0.62F, 0.70F, 1.0F),
-            impl_->subtitle_brush.GetAddressOf()
-        );
     }
     if (!impl_->title_format) {
         impl_->dwrite_factory->CreateTextFormat(
@@ -146,17 +144,18 @@ bool DeckRenderer::Initialize(HWND hwnd) {
             impl_->subtitle_format.GetAddressOf()
         );
     }
-    return impl_->background_brush && impl_->title_brush && impl_->subtitle_brush
-        && impl_->title_format && impl_->subtitle_format;
+    return impl_->title_format && impl_->subtitle_format;
 }
 
 // ----------------------------------------------------------------------------
-// Redimensionne la cible Direct2D pour suivre le client Win32.
+// Redimensionne la cible DirectComposition pour suivre le client Win32.
 // ----------------------------------------------------------------------------
 void DeckRenderer::Resize(HWND hwnd) {
-    if (impl_ != nullptr && impl_->render_target) {
-        impl_->render_target->Resize(ClientPixelSize(hwnd));
+    if (impl_ == nullptr) {
+        return;
     }
+    const D2D1_SIZE_U size = ClientPixelSize(hwnd);
+    impl_->composition.Resize(size.width, size.height, WindowDpi(hwnd));
 }
 
 // ----------------------------------------------------------------------------
@@ -167,26 +166,44 @@ void DeckRenderer::Render(HWND hwnd, const DeckVisualState& state) {
         return;
     }
 
-    const D2D1_SIZE_F size = impl_->render_target->GetSize();
-    impl_->render_target->BeginDraw();
-    impl_->render_target->Clear(D2D1::ColorF(0.07F, 0.08F, 0.10F, 1.0F));
-    impl_->render_target->FillRectangle(D2D1::RectF(0.0F, 0.0F, size.width, size.height), impl_->background_brush.Get());
-    impl_->render_target->DrawTextW(
+    auto context_result = impl_->composition.BeginDraw();
+    if (!context_result.has_value()) {
+        return;
+    }
+    ID2D1DeviceContext* context = *context_result;
+    if (!impl_->background_brush) {
+        context->CreateSolidColorBrush(
+            D2D1::ColorF(0.07F, 0.08F, 0.10F, 1.0F),
+            impl_->background_brush.GetAddressOf()
+        );
+        context->CreateSolidColorBrush(
+            D2D1::ColorF(0.92F, 0.95F, 0.98F, 1.0F),
+            impl_->title_brush.GetAddressOf()
+        );
+        context->CreateSolidColorBrush(
+            D2D1::ColorF(0.56F, 0.62F, 0.70F, 1.0F),
+            impl_->subtitle_brush.GetAddressOf()
+        );
+    }
+
+    const D2D1_SIZE_F size = context->GetSize();
+    context->Clear(D2D1::ColorF(0.07F, 0.08F, 0.10F, 1.0F));
+    context->FillRectangle(D2D1::RectF(0.0F, 0.0F, size.width, size.height), impl_->background_brush.Get());
+    context->DrawTextW(
         state.title.c_str(),
         static_cast<UINT32>(state.title.size()),
         impl_->title_format.Get(),
         D2D1::RectF(kDeckContentLeft, kDeckContentTop, size.width - kDeckContentLeft, kDeckContentTop + kDeckTitleHeight),
         impl_->title_brush.Get()
     );
-    impl_->render_target->DrawTextW(
+    context->DrawTextW(
         state.subtitle.c_str(),
         static_cast<UINT32>(state.subtitle.size()),
         impl_->subtitle_format.Get(),
         D2D1::RectF(kDeckContentLeft, kDeckContentTop + kDeckTitleHeight, size.width - kDeckContentLeft, kDeckContentTop + kDeckTitleHeight + kDeckSubtitleHeight),
         impl_->subtitle_brush.Get()
     );
-
-    if (impl_->render_target->EndDraw() == D2DERR_RECREATE_TARGET) {
+    if (!impl_->composition.EndDraw().has_value()) {
         DiscardDeviceResources();
     }
 }
@@ -203,5 +220,4 @@ void DeckRenderer::DiscardDeviceResources() {
     impl_->subtitle_brush.Reset();
     impl_->title_brush.Reset();
     impl_->background_brush.Reset();
-    impl_->render_target.Reset();
 }

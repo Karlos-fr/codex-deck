@@ -10,6 +10,11 @@
 #include "../window/DeckWindow.h"
 
 // ----------------------------------------------------------------------------
+// Libere les ressources applicatives possedees.
+// ----------------------------------------------------------------------------
+DeckApp::~DeckApp() = default;
+
+// ----------------------------------------------------------------------------
 // Lance la boucle de messages de l'application.
 // ----------------------------------------------------------------------------
 int DeckApp::Run(HINSTANCE instance, int command_show) {

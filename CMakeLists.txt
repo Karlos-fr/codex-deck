@@ -110,6 +110,7 @@ target_compile_definitions(sqlite3 PRIVATE
 add_executable(CodexDeck WIN32
     ${CMAKE_CURRENT_BINARY_DIR}/generated/VersionInfo.rc
     src/app/DeckApp.cpp
+    src/graphics/CompositionHost.cpp
     src/main.cpp
     src/rendering/DeckRenderer.cpp
     src/resources/CodexDeck.rc
@@ -140,6 +141,9 @@ target_compile_definitions(CodexDeck PRIVATE
 
 target_link_libraries(CodexDeck PRIVATE
     d2d1
+    d3d11
+    dxgi
+    dcomp
     dwrite
     dwmapi
     user32
@@ -204,4 +208,22 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/DeckWindowGeometr
     )
     target_link_libraries(DeckWindowGeometryTests PRIVATE dwmapi user32)
     add_test(NAME DeckWindowGeometryTests COMMAND DeckWindowGeometryTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CompositionSmokeTests.cpp")
+    add_executable(CompositionSmokeTests
+        tests/CompositionSmokeTests.cpp
+        src/graphics/CompositionHost.cpp
+    )
+    codex_deck_enable_cpp23(CompositionSmokeTests)
+    codex_deck_enable_msvc_defaults(CompositionSmokeTests)
+    target_include_directories(CompositionSmokeTests PRIVATE src)
+    target_compile_definitions(CompositionSmokeTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    target_link_libraries(CompositionSmokeTests PRIVATE d2d1 dcomp dwrite d3d11 dxgi user32)
+    add_test(NAME CompositionSmokeTests COMMAND CompositionSmokeTests)
 endif()

@@ -387,7 +387,7 @@ ctest --test-dir build -C Debug --output-on-failure
 
 Lancer `build\CodexDeck.exe` et vérifier : fenêtre redimensionnable, titre Codex Deck, DPI correct, fermeture propre.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add -A
@@ -413,11 +413,11 @@ git commit -m "refactor: replace quota widget with Codex Deck shell"
 - Produces: `CompositionHost::BeginDraw() -> std::expected<ID2D1DeviceContext*, GraphicsError>`.
 - Produces: `CompositionHost::EndDraw() -> std::expected<void, GraphicsError>`.
 
-- [ ] **Step 1: Écrire un smoke test avec une fenêtre Win32 cachée**
+- [x] **Step 1: Écrire un smoke test avec une fenêtre Win32 cachée**
 
 Le test crée une classe/fenêtre top-level non affichée, initialise `CompositionHost`, appelle `BeginDraw`, `Clear`, `EndDraw`, puis détruit la fenêtre. Retour non zéro sur chaque échec.
 
-- [ ] **Step 2: Vérifier l’échec**
+- [x] **Step 2: Vérifier l’échec**
 
 ```powershell
 cmake --build build
@@ -426,7 +426,7 @@ ctest --test-dir build -R CompositionSmokeTests --output-on-failure
 
 Expected: FAIL car `CompositionHost` n’existe pas.
 
-- [ ] **Step 3: Définir les erreurs graphiques**
+- [x] **Step 3: Définir les erreurs graphiques**
 
 `GraphicsError.h` :
 
@@ -451,15 +451,15 @@ struct GraphicsError {
 };
 ```
 
-- [ ] **Step 4: Implémenter `CompositionHost`**
+- [x] **Step 4: Implémenter `CompositionHost`**
 
 Le module possède : D3D11 device avec `D3D11_CREATE_DEVICE_BGRA_SUPPORT`, DXGI device/factory, swap chain `DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL` créé via `CreateSwapChainForComposition`, factory/device/context Direct2D 1.1, `IDCompositionDevice`, target HWND et root visual. Le root visual reçoit le swap chain comme contenu puis `Commit()`.
 
-- [ ] **Step 5: Brancher `DeckRenderer` sur le contexte Direct2D de composition**
+- [x] **Step 5: Brancher `DeckRenderer` sur le contexte Direct2D de composition**
 
 `DeckRenderer` ne possède plus un `ID2D1HwndRenderTarget`. Il possède un `CompositionHost` et crée ses brosses/formats autour du `ID2D1DeviceContext` exposé par `BeginDraw()`.
 
-- [ ] **Step 6: Lier les bibliothèques nécessaires**
+- [x] **Step 6: Lier les bibliothèques nécessaires**
 
 Dans `CMakeLists.txt` :
 
@@ -471,7 +471,7 @@ target_link_libraries(CodexDeck PRIVATE
 
 Ajouter `dcomp` au smoke test.
 
-- [ ] **Step 7: Valider test + application**
+- [x] **Step 7: Valider test + application**
 
 ```powershell
 cmake --build build
