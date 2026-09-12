@@ -607,3 +607,15 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/navigation/Projec
     target_link_libraries(ProjectTreeModelTests PRIVATE nlohmann_json::nlohmann_json)
     add_test(NAME ProjectTreeModelTests COMMAND ProjectTreeModelTests)
 endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/VirtualListLayoutTests.cpp")
+    add_executable(VirtualListLayoutTests
+        tests/ui/VirtualListLayoutTests.cpp
+        src/ui/ScrollState.cpp
+        src/ui/VirtualListLayout.cpp
+    )
+    codex_deck_enable_cpp23(VirtualListLayoutTests)
+    codex_deck_enable_msvc_defaults(VirtualListLayoutTests)
+    target_include_directories(VirtualListLayoutTests PRIVATE src)
+    add_test(NAME VirtualListLayoutTests COMMAND VirtualListLayoutTests)
+endif()

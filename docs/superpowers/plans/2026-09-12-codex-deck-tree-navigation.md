@@ -106,7 +106,7 @@ git commit -m "feat: build project and session tree model"
 - Produces: `VisibleRange ComputeVisibleRange(...)`.
 - Produces: `ScrollState::ScrollBy`, `EnsureVisible`, `Clamp`.
 
-- [ ] **Step 1: Écrire les tests sur 10 000 lignes**
+- [x] **Step 1: Écrire les tests sur 10 000 lignes**
 
 ```cpp
 const auto range = ComputeVisibleRange(10'000, 30.0f, 12'000.0f, 600.0f, 2);
@@ -116,7 +116,7 @@ if ((range.last - range.first) > 25) return 2;
 
 Tester haut, milieu, bas, viewport vide et overscan.
 
-- [ ] **Step 2: Implémenter le calcul O(1)**
+- [x] **Step 2: Implémenter le calcul O(1)**
 
 ```cpp
 struct VisibleRange { std::size_t first; std::size_t last; };
@@ -131,11 +131,11 @@ VisibleRange ComputeVisibleRange(
 
 Ne jamais itérer sur `item_count` pour calculer la plage visible.
 
-- [ ] **Step 3: Implémenter `ScrollState`**
+- [x] **Step 3: Implémenter `ScrollState`**
 
 Stocker `offset`, `content_extent`, `viewport_extent`. `Clamp()` borne entre `0` et `max(0, content - viewport)`. `EnsureVisible(index,rowHeight)` ne déplace que si la ligne est hors viewport.
 
-- [ ] **Step 4: Valider et commit**
+- [x] **Step 4: Valider et commit**
 
 ```bash
 git add src/ui tests/ui
