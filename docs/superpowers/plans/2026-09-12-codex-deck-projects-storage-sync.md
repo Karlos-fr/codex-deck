@@ -381,11 +381,11 @@ git commit -m "feat: synchronize Codex sessions with local organization"
 - Produces: `AssignManual(thread_id, optional<ProjectId>)`.
 - Produces: `RevertToAutomatic(thread_id)`.
 
-- [ ] **Step 1: Écrire le test de tri**
+- [x] **Step 1: Écrire le test de tri**
 
 Vérifier : sessions décroissantes par `last_activity`; projet trié selon la session la plus récente; `Unassigned` hors classement et placé dans sa zone fixe par la future UI.
 
-- [ ] **Step 2: Définir les événements qui modifient `last_activity`**
+- [x] **Step 2: Définir les événements qui modifient `last_activity`**
 
 Mettre à jour l’activité uniquement sur :
 
@@ -399,13 +399,13 @@ sync externe avec updatedAt plus récent
 
 Ne pas mettre à jour sur delta de streaming, ligne stdout ou repaint UI.
 
-- [ ] **Step 3: Implémenter l’association manuelle optimiste**
+- [x] **Step 3: Implémenter l’association manuelle optimiste**
 
 `AssignManual` publie d’abord un snapshot avec le nouveau `project_id`, persiste ensuite SQLite sur le worker ; en cas d’erreur, republie l’ancienne valeur et expose `StorageError` au callback d’erreur UI.
 
 `AssignManual(thread, nullopt)` signifie explicitement « garder cette session dans Unassigned » et stocke `assignment_source=Manual`.
 
-- [ ] **Step 4: Valider et commit**
+- [x] **Step 4: Valider et commit**
 
 ```powershell
 ctest --preset debug -R "ActivityOrderingTests|ProjectAssignmentServiceTests" --output-on-failure

@@ -529,3 +529,39 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/sync/SessionSyncT
     target_link_libraries(SessionSyncTests PRIVATE sqlite3 nlohmann_json::nlohmann_json)
     add_test(NAME SessionSyncTests COMMAND SessionSyncTests)
 endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/model/ActivityOrderingTests.cpp")
+    add_executable(ActivityOrderingTests
+        tests/model/ActivityOrderingTests.cpp
+        src/model/ActivityOrdering.cpp
+    )
+    codex_deck_enable_cpp23(ActivityOrderingTests)
+    codex_deck_enable_msvc_defaults(ActivityOrderingTests)
+    target_include_directories(ActivityOrderingTests PRIVATE src)
+    target_link_libraries(ActivityOrderingTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME ActivityOrderingTests COMMAND ActivityOrderingTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/projects/ProjectAssignmentServiceTests.cpp")
+    add_executable(ProjectAssignmentServiceTests
+        tests/projects/ProjectAssignmentServiceTests.cpp
+        src/model/SessionCatalog.cpp
+        src/projects/ProjectAssignmentService.cpp
+        src/projects/PathNormalization.cpp
+        src/projects/ProjectRepository.cpp
+        src/storage/SchemaMigrator.cpp
+        src/storage/SessionMetadataRepository.cpp
+        src/storage/SqliteDatabase.cpp
+    )
+    codex_deck_enable_cpp23(ProjectAssignmentServiceTests)
+    codex_deck_enable_msvc_defaults(ProjectAssignmentServiceTests)
+    target_include_directories(ProjectAssignmentServiceTests PRIVATE src)
+    target_compile_definitions(ProjectAssignmentServiceTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    target_link_libraries(ProjectAssignmentServiceTests PRIVATE sqlite3 nlohmann_json::nlohmann_json)
+    add_test(NAME ProjectAssignmentServiceTests COMMAND ProjectAssignmentServiceTests)
+endif()
