@@ -37,7 +37,7 @@
 - Produces: `OpenDatabase(path) -> expected<SqliteDatabase, StorageError>`.
 - Produces: `SchemaMigrator::Migrate(SqliteDatabase&) -> expected<void, StorageError>`.
 
-- [ ] **Step 1: Écrire le test de migration sur fichier temporaire**
+- [x] **Step 1: Écrire le test de migration sur fichier temporaire**
 
 Le test crée `%TEMP%\CodexDeckTests\storage-<pid>.db`, appelle `Migrate`, puis vérifie :
 
@@ -47,14 +47,14 @@ SELECT value FROM app_meta WHERE key='schema_version';
 
 Expected: `1`.
 
-- [ ] **Step 2: Vérifier l’échec**
+- [x] **Step 2: Vérifier l’échec**
 
 ```powershell
 cmake --build --preset debug
 ctest --preset debug -R SqliteDatabaseTests --output-on-failure
 ```
 
-- [ ] **Step 3: Définir l’erreur de stockage**
+- [x] **Step 3: Définir l’erreur de stockage**
 
 ```cpp
 enum class StorageErrorCode { OpenFailed, SqlFailed, MigrationFailed, ConstraintFailed };
@@ -65,7 +65,7 @@ struct StorageError {
 };
 ```
 
-- [ ] **Step 4: Implémenter un wrapper move-only**
+- [x] **Step 4: Implémenter un wrapper move-only**
 
 `SqliteDatabase` possède `sqlite3*`, interdit la copie, autorise move, ferme en destructeur et expose :
 
@@ -82,7 +82,7 @@ PRAGMA journal_mode=WAL;
 PRAGMA synchronous=NORMAL;
 ```
 
-- [ ] **Step 5: Créer le schéma v1**
+- [x] **Step 5: Créer le schéma v1**
 
 ```sql
 CREATE TABLE app_meta(
@@ -128,7 +128,7 @@ CREATE TABLE workspace_state(
 
 `assignment_source`: `0=automatic`, `1=manual`.
 
-- [ ] **Step 6: Valider puis commit**
+- [x] **Step 6: Valider puis commit**
 
 ```powershell
 cmake --build --preset debug

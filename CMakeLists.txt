@@ -409,3 +409,22 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/codex/CodexSuperv
     target_link_libraries(CodexSupervisorTests PRIVATE nlohmann_json::nlohmann_json)
     add_test(NAME CodexSupervisorTests COMMAND CodexSupervisorTests $<TARGET_FILE:FakeAppServer>)
 endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/storage/SqliteDatabaseTests.cpp")
+    add_executable(SqliteDatabaseTests
+        tests/storage/SqliteDatabaseTests.cpp
+        src/storage/SchemaMigrator.cpp
+        src/storage/SqliteDatabase.cpp
+    )
+    codex_deck_enable_cpp23(SqliteDatabaseTests)
+    codex_deck_enable_msvc_defaults(SqliteDatabaseTests)
+    target_include_directories(SqliteDatabaseTests PRIVATE src)
+    target_compile_definitions(SqliteDatabaseTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    target_link_libraries(SqliteDatabaseTests PRIVATE sqlite3)
+    add_test(NAME SqliteDatabaseTests COMMAND SqliteDatabaseTests)
+endif()
