@@ -10,10 +10,12 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-12-codex-deck-design.md`
 
+**Contrats normatifs partagés:** `docs/superpowers/plans/2026-09-12-codex-deck-shared-contracts.md`
+
 ## Global Constraints
 
 - La V1 cible **Windows 11 x64**.
-- Le code applicatif est compilé en **C++23**.
+- Le code applicatif est compilé en **C++23 strict** ; sous MSVC, suivre le sélecteur de switch `/std:c++23` puis `/std:c++23preview` défini dans les contrats partagés et ne pas retomber implicitement sur `/std:c++latest`.
 - Aucun framework UI lourd ni navigateur embarqué.
 - Codex est la source de vérité pour les threads, conversations, noms et états Codex.
 - SQLite ne duplique pas l’historique complet des conversations.
@@ -23,10 +25,13 @@
 - Les modules restent petits et focalisés ; pas de fichier fourre-tout.
 - Debug et Release doivent compiler et CTest doit passer à chaque jalon.
 - Le dépôt `native-win32-glass-kit` actuel n’est pas une dépendance de la V1.
+- En cas de contradiction entre une signature d’un plan individuel et `2026-09-12-codex-deck-shared-contracts.md`, les contrats partagés prennent priorité.
 
 ---
 
 ## Ordre d’exécution
+
+Avant le plan 1, lire `2026-09-12-codex-deck-shared-contracts.md`. Il ne s’agit pas d’un chantier supplémentaire mais du contrat commun aux six plans.
 
 1. `2026-09-12-codex-deck-bootstrap-foundation.md`
    - Importe le socle éprouvé de Codex Glass.
@@ -72,4 +77,4 @@ réussissent, et que le critère de sortie du plan est vérifié manuellement lo
 
 ## Stratégie Git
 
-Chaque tâche du plan détaillé se termine par un commit focalisé. Les plans doivent être exécutés dans l’ordre ; ne pas démarrer le Workbench avant que les contrats `SessionModel`, `ProjectModel` et `CodexClient` soient stabilisés par les plans précédents.
+Chaque tâche du plan détaillé se termine par un commit focalisé. Les plans doivent être exécutés dans l’ordre ; ne pas démarrer le Workbench avant que les contrats `CodexClient`, `SessionRuntimeRegistry`, `SessionCatalog` et `Project` soient stabilisés par les plans précédents.
