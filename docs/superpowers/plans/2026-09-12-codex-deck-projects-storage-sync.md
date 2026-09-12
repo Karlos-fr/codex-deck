@@ -226,7 +226,7 @@ git commit -m "feat: persist projects and session metadata"
 - Produces: `GitProjectProbe::Inspect(cwd) -> expected<optional<GitProjectIdentity>, ProjectDetectionError>`.
 - Produces: `ProjectDetector::Detect(thread, projects, metadata) -> optional<ProjectId>`.
 
-- [ ] **Step 1: Définir l’identité Git sans moteur Git**
+- [x] **Step 1: Définir l’identité Git sans moteur Git**
 
 ```cpp
 struct GitProjectIdentity {
@@ -244,7 +244,7 @@ git -C <root> remote get-url origin
 
 via un petit process capturé interne. Un Git absent ou un cwd hors repo renvoie `std::nullopt`, pas une erreur fatale de synchronisation.
 
-- [ ] **Step 2: Écrire les tests de priorité**
+- [x] **Step 2: Écrire les tests de priorité**
 
 Construire trois projets synthétiques et vérifier :
 
@@ -258,7 +258,7 @@ aucun match                     -> nullopt (Unassigned)
 
 Le `GitProjectProbe` est injecté par interface dans le test pour ne pas lancer Git.
 
-- [ ] **Step 3: Implémenter la détection**
+- [x] **Step 3: Implémenter la détection**
 
 Signature :
 
@@ -273,7 +273,7 @@ std::optional<ProjectId> DetectProject(
 
 Si `existing_metadata.assignment_source == Manual`, retourner exactement son `project_id`, y compris `nullopt` pour un déplacement manuel vers `Unassigned`.
 
-- [ ] **Step 4: Valider et commit**
+- [x] **Step 4: Valider et commit**
 
 ```powershell
 ctest --preset debug -R ProjectDetectorTests --output-on-failure

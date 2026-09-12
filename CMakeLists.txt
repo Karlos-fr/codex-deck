@@ -471,3 +471,23 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/storage/SessionMe
     target_link_libraries(SessionMetadataRepositoryTests PRIVATE sqlite3 nlohmann_json::nlohmann_json)
     add_test(NAME SessionMetadataRepositoryTests COMMAND SessionMetadataRepositoryTests)
 endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/projects/ProjectDetectorTests.cpp")
+    add_executable(ProjectDetectorTests
+        tests/projects/ProjectDetectorTests.cpp
+        src/projects/GitProjectProbe.cpp
+        src/projects/PathNormalization.cpp
+        src/projects/ProjectDetector.cpp
+    )
+    codex_deck_enable_cpp23(ProjectDetectorTests)
+    codex_deck_enable_msvc_defaults(ProjectDetectorTests)
+    target_include_directories(ProjectDetectorTests PRIVATE src)
+    target_compile_definitions(ProjectDetectorTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    target_link_libraries(ProjectDetectorTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME ProjectDetectorTests COMMAND ProjectDetectorTests)
+endif()
