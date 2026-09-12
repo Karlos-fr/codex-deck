@@ -34,7 +34,7 @@
 **Interfaces:**
 - Produces: `TreeRow`, `ProjectTreeState`, `BuildProjectTreeRows(...)`.
 
-- [ ] **Step 1: Définir les lignes**
+- [x] **Step 1: Définir les lignes**
 
 ```cpp
 enum class TreeRowKind { Project, Session, More, UnassignedHeader, ArchiveEntry };
@@ -58,18 +58,18 @@ struct ProjectTreeState {
 };
 ```
 
-- [ ] **Step 2: Écrire les tests de structure et tri**
+- [x] **Step 2: Écrire les tests de structure et tri**
 
 Cas exact : deux projets, 10 sessions dans le premier, 1 dans le second, 2 Unassigned. Vérifier projet le plus récent en premier, 8 sessions + `More(hidden_count=2)`, puis second projet, puis section Unassigned fixe.
 
-- [ ] **Step 3: Vérifier l’échec**
+- [x] **Step 3: Vérifier l’échec**
 
 ```powershell
 cmake --build --preset debug
 ctest --preset debug -R ProjectTreeModelTests --output-on-failure
 ```
 
-- [ ] **Step 4: Implémenter `BuildProjectTreeRows`**
+- [x] **Step 4: Implémenter `BuildProjectTreeRows`**
 
 Signature :
 
@@ -83,7 +83,7 @@ std::vector<TreeRow> BuildProjectTreeRows(
 
 Les IDs stables utilisent `project:<id>`, `thread:<threadId>`, `more:<projectId>`, `unassigned`.
 
-- [ ] **Step 5: Valider et commit**
+- [x] **Step 5: Valider et commit**
 
 ```powershell
 ctest --preset debug -R ProjectTreeModelTests --output-on-failure

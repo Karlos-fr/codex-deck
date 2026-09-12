@@ -594,3 +594,16 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/storage/AppDataPa
     target_link_libraries(AppDataPathsTests PRIVATE shell32 ole32)
     add_test(NAME AppDataPathsTests COMMAND AppDataPathsTests)
 endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/navigation/ProjectTreeModelTests.cpp")
+    add_executable(ProjectTreeModelTests
+        tests/navigation/ProjectTreeModelTests.cpp
+        src/model/ActivityOrdering.cpp
+        src/navigation/ProjectTreeModel.cpp
+    )
+    codex_deck_enable_cpp23(ProjectTreeModelTests)
+    codex_deck_enable_msvc_defaults(ProjectTreeModelTests)
+    target_include_directories(ProjectTreeModelTests PRIVATE src)
+    target_link_libraries(ProjectTreeModelTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME ProjectTreeModelTests COMMAND ProjectTreeModelTests)
+endif()
