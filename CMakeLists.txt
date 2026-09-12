@@ -246,3 +246,21 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/ThemeTests.cpp")
     target_link_libraries(ThemeTests PRIVATE d2d1 dwmapi advapi32 user32)
     add_test(NAME ThemeTests COMMAND ThemeTests)
 endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/codex/CodexProtocolTests.cpp")
+    add_executable(CodexProtocolTests
+        tests/codex/CodexProtocolTests.cpp
+        src/codex/CodexProtocol.cpp
+    )
+    codex_deck_enable_cpp23(CodexProtocolTests)
+    codex_deck_enable_msvc_defaults(CodexProtocolTests)
+    target_include_directories(CodexProtocolTests PRIVATE src)
+    target_compile_definitions(CodexProtocolTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    target_link_libraries(CodexProtocolTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME CodexProtocolTests COMMAND CodexProtocolTests)
+endif()

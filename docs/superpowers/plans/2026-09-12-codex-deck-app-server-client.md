@@ -37,7 +37,7 @@
 - Produces: `ParseThreadSummary(const nlohmann::json&) -> std::expected<CodexThreadSummary, CodexError>`.
 - Produces: `ParseServerMessage(const nlohmann::json&) -> std::expected<CodexInboundMessage, CodexError>`.
 
-- [ ] **Step 1: Écrire les fixtures de protocole minimales**
+- [x] **Step 1: Écrire les fixtures de protocole minimales**
 
 Dans `CodexProtocolTests.cpp`, tester ce thread avec des champs inconnus supplémentaires :
 
@@ -60,7 +60,7 @@ if (parsed->name != "Audio parity") return 3;
 
 Ajouter des tests séparés pour une réponse JSON-RPC, une notification et une server request `item/commandExecution/requestApproval`.
 
-- [ ] **Step 2: Vérifier l’échec**
+- [x] **Step 2: Vérifier l’échec**
 
 ```powershell
 cmake --build --preset debug
@@ -69,7 +69,7 @@ ctest --preset debug -R CodexProtocolTests --output-on-failure
 
 Expected: FAIL car les types n’existent pas.
 
-- [ ] **Step 3: Définir les erreurs**
+- [x] **Step 3: Définir les erreurs**
 
 `CodexError.h` :
 
@@ -98,7 +98,7 @@ struct CodexError {
 };
 ```
 
-- [ ] **Step 4: Définir les modèles stables**
+- [x] **Step 4: Définir les modèles stables**
 
 `CodexTypes.h` :
 
@@ -133,7 +133,7 @@ using CodexInboundMessage = std::variant<CodexNotification, CodexServerRequest, 
 
 La variante `nlohmann::json` finale représente une réponse RPC déjà validée au niveau enveloppe et routée ensuite par ID.
 
-- [ ] **Step 5: Implémenter le parsing d’enveloppe**
+- [x] **Step 5: Implémenter le parsing d’enveloppe**
 
 Règles :
 
@@ -146,7 +146,7 @@ sinon                      -> InvalidResponse
 
 `ParseThreadSummary` exige uniquement `id`; `name`, `cwd`, timestamps et archive disposent de valeurs par défaut sûres.
 
-- [ ] **Step 6: Valider**
+- [x] **Step 6: Valider**
 
 ```powershell
 cmake --build --preset debug
