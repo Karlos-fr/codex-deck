@@ -7,6 +7,8 @@
 
 #include "JsonRpcTransport.h"
 
+#include <chrono>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -162,6 +164,12 @@ std::expected<void, CodexError> JsonRpcTransport::SendResponse(const nlohmann::j
 // ----------------------------------------------------------------------------
 void JsonRpcTransport::Stop() {
     const bool was_stopping = stopping_.exchange(true);
+    if (reader_.joinable()) {
+        CancelSynchronousIo(reader_.native_handle());
+        if (stdout_read_ != nullptr && stdout_read_ != INVALID_HANDLE_VALUE) {
+            CancelIoEx(stdout_read_, nullptr);
+        }
+    }
     CloseIfValid(stdout_read_);
     CloseIfValid(stdin_write_);
     if (reader_.joinable()) {
@@ -179,8 +187,17 @@ void JsonRpcTransport::Stop() {
 void JsonRpcTransport::ReadLoop() {
     std::string line;
     char ch = '\0';
-    DWORD read = 0;
     while (!stopping_) {
+        DWORD available = 0;
+        if (!PeekNamedPipe(stdout_read_, nullptr, 0, nullptr, &available, nullptr)) {
+            break;
+        }
+        if (available == 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
+        }
+
+        DWORD read = 0;
         const BOOL ok = ReadFile(stdout_read_, &ch, 1, &read, nullptr);
         if (!ok || read == 0) {
             break;
