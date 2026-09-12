@@ -153,7 +153,7 @@ cmake --build --preset debug
 ctest --preset debug -R CodexProtocolTests --output-on-failure
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/codex tests/codex CMakeLists.txt
@@ -178,7 +178,7 @@ git commit -m "feat: define Codex app-server protocol types"
 - Produces: `CodexProcess::Start(const CodexLaunchSpec&) -> expected<void, CodexError>`.
 - Produces: `TakeStdoutReadHandle()`, `StdinWriteHandle()`, `IsRunning()`, `Stop()`.
 
-- [ ] **Step 1: Écrire les tests de priorité de résolution**
+- [x] **Step 1: Écrire les tests de priorité de résolution**
 
 Le resolver applique exactement cet ordre :
 
@@ -200,7 +200,7 @@ std::expected<CodexLaunchSpec, CodexError> ResolveCodexExecutable(
 );
 ```
 
-- [ ] **Step 2: Vérifier l’échec puis implémenter le resolver**
+- [x] **Step 2: Vérifier l’échec puis implémenter le resolver**
 
 Pour `.exe`, `CodexLaunchSpec` contient l’exécutable directement. Pour `.cmd`, utiliser `%ComSpec%` comme application et construire :
 
@@ -210,7 +210,7 @@ Pour `.exe`, `CodexLaunchSpec` contient l’exécutable directement. Pour `.cmd`
 
 Ne pas lancer un `.ps1` implicitement.
 
-- [ ] **Step 3: Créer le faux app-server**
+- [x] **Step 3: Créer le faux app-server**
 
 `tests/fakes/FakeAppServer.cpp` lit stdin avec `std::getline`, parse chaque ligne JSON, puis :
 
@@ -223,17 +223,17 @@ exit         -> termine le processus avec code 17
 
 Chaque réponse est écrite sur une seule ligne JSON et flushée.
 
-- [ ] **Step 4: Implémenter `CodexProcess`**
+- [x] **Step 4: Implémenter `CodexProcess`**
 
 Utiliser deux pipes anonymes avec handles enfant héritables, `STARTUPINFOEXW` ou `STARTUPINFOW`, `CreateProcessW(..., CREATE_NO_WINDOW, ...)` et un Job Object configuré avec `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`.
 
 Le parent ferme immédiatement les extrémités de pipe qui appartiennent à l’enfant.
 
-- [ ] **Step 5: Ajouter un test de cycle de vie process**
+- [x] **Step 5: Ajouter un test de cycle de vie process**
 
 Le test lance `FakeAppServer.exe`, vérifie `IsRunning()`, écrit une ligne, lit une réponse, appelle `Stop()` puis vérifie que le process n’est plus actif.
 
-- [ ] **Step 6: Valider et commit**
+- [x] **Step 6: Valider et commit**
 
 ```powershell
 cmake --build --preset debug

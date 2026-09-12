@@ -264,3 +264,46 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/codex/CodexProtoc
     target_link_libraries(CodexProtocolTests PRIVATE nlohmann_json::nlohmann_json)
     add_test(NAME CodexProtocolTests COMMAND CodexProtocolTests)
 endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/codex/CodexExecutableResolverTests.cpp")
+    add_executable(CodexExecutableResolverTests
+        tests/codex/CodexExecutableResolverTests.cpp
+        src/codex/CodexExecutableResolver.cpp
+    )
+    codex_deck_enable_cpp23(CodexExecutableResolverTests)
+    codex_deck_enable_msvc_defaults(CodexExecutableResolverTests)
+    target_include_directories(CodexExecutableResolverTests PRIVATE src)
+    target_compile_definitions(CodexExecutableResolverTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    add_test(NAME CodexExecutableResolverTests COMMAND CodexExecutableResolverTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fakes/FakeAppServer.cpp")
+    add_executable(FakeAppServer
+        tests/fakes/FakeAppServer.cpp
+    )
+    codex_deck_enable_cpp23(FakeAppServer)
+    codex_deck_enable_msvc_defaults(FakeAppServer)
+    target_link_libraries(FakeAppServer PRIVATE nlohmann_json::nlohmann_json)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/codex/CodexProcessTests.cpp")
+    add_executable(CodexProcessTests
+        tests/codex/CodexProcessTests.cpp
+        src/codex/CodexProcess.cpp
+    )
+    codex_deck_enable_cpp23(CodexProcessTests)
+    codex_deck_enable_msvc_defaults(CodexProcessTests)
+    target_include_directories(CodexProcessTests PRIVATE src)
+    target_compile_definitions(CodexProcessTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    add_test(NAME CodexProcessTests COMMAND CodexProcessTests $<TARGET_FILE:FakeAppServer>)
+endif()
