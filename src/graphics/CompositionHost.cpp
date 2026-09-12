@@ -98,11 +98,25 @@ UINT ClampDimension(UINT value) {
 }  // namespace
 
 // ----------------------------------------------------------------------------
+// Libere les ressources graphiques possedees.
+// ----------------------------------------------------------------------------
+CompositionHost::~CompositionHost() {
+    delete impl_;
+}
+
+// ----------------------------------------------------------------------------
 // Initialise les devices graphiques et la cible DirectComposition.
 // ----------------------------------------------------------------------------
 std::expected<void, GraphicsError> CompositionHost::Initialize(HWND hwnd) {
     if (impl_ == nullptr) {
         impl_ = new Impl();
+    }
+    if (impl_->hwnd == hwnd
+        && impl_->d2d_context
+        && impl_->composition_device
+        && impl_->composition_target
+        && impl_->root_visual) {
+        return {};
     }
     impl_->hwnd = hwnd;
 

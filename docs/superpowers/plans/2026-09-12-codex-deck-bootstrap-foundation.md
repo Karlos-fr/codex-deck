@@ -480,7 +480,7 @@ ctest --test-dir build -R "CompositionSmokeTests|DeckWindowGeometryTests|SingleI
 
 Puis redimensionner manuellement la fenêtre rapidement : aucun flash blanc ni artefact de resize.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/graphics src/rendering CMakeLists.txt tests/CompositionSmokeTests.cpp
@@ -506,7 +506,7 @@ git commit -m "feat: add DirectComposition rendering host"
 - Produces: `ResolveTheme(ThemeMode requested, bool system_dark) -> ResolvedTheme`.
 - Produces: `PaletteForTheme(ResolvedTheme) -> ThemePalette`.
 
-- [ ] **Step 1: Écrire les tests de résolution**
+- [x] **Step 1: Écrire les tests de résolution**
 
 ```cpp
 if (ResolveTheme(ThemeMode::System, true) != ResolvedTheme::Dark) return 1;
@@ -515,14 +515,14 @@ if (ResolveTheme(ThemeMode::Dark, false) != ResolvedTheme::Dark) return 3;
 if (ResolveTheme(ThemeMode::Light, true) != ResolvedTheme::Light) return 4;
 ```
 
-- [ ] **Step 2: Vérifier l’échec**
+- [x] **Step 2: Vérifier l’échec**
 
 ```powershell
 cmake --build build
 ctest --test-dir build -R ThemeTests --output-on-failure
 ```
 
-- [ ] **Step 3: Implémenter le contrat thème**
+- [x] **Step 3: Implémenter le contrat thème**
 
 `Theme.h` contient les deux enums et :
 
@@ -534,19 +534,19 @@ void ApplySystemWindowTheme(HWND hwnd, ResolvedTheme theme);
 
 `IsSystemDarkTheme()` lit `AppsUseLightTheme` sous `HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize`, avec repli clair si la valeur n’est pas disponible.
 
-- [ ] **Step 4: Définir une palette stable**
+- [x] **Step 4: Définir une palette stable**
 
 `ThemePalette` contient au minimum `window_background`, `surface`, `surface_hover`, `border`, `text`, `text_muted`, `accent`, `success`, `warning`, `error` en `D2D1_COLOR_F`.
 
-- [ ] **Step 5: Réagir aux changements système**
+- [x] **Step 5: Réagir aux changements système**
 
 Dans `DeckApp`, traiter `WM_SETTINGCHANGE` et `WM_THEMECHANGED`; si `ThemeMode::System`, recalculer le thème, appliquer DWM et invalider le renderer. `Light` et `Dark` ignorent les bascules système.
 
-- [ ] **Step 6: Ajouter les presets Debug/Release reproductibles**
+- [x] **Step 6: Ajouter les presets Debug/Release reproductibles**
 
 `CMakePresets.json` doit fournir `debug` et `release` en x64, avec Ninja si disponible dans l’environnement de développement déjà utilisé par Codex Glass.
 
-- [ ] **Step 7: Validation finale du plan**
+- [x] **Step 7: Validation finale du plan**
 
 ```powershell
 cmake --preset debug
@@ -559,7 +559,7 @@ ctest --preset release --output-on-failure
 
 Vérification manuelle : les trois modes System/Light/Dark changent fond, texte et attribut DWM sans redémarrer.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/theme src/settings src/app src/rendering tests CMakeLists.txt CMakePresets.json

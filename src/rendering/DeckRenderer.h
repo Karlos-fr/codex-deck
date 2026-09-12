@@ -8,6 +8,7 @@
 #pragma once
 
 #include "../graphics/CompositionHost.h"
+#include "../theme/ThemePalette.h"
 
 #include <windows.h>
 
@@ -65,8 +66,9 @@ public:
     // Parametres :
     // - hwnd : fenetre cible, utilisee pour recreer les ressources au besoin.
     // - state : textes a afficher.
+    // - palette : couleurs resolues a utiliser.
     // ------------------------------------------------------------------------
-    void Render(HWND hwnd, const DeckVisualState& state);
+    void Render(HWND hwnd, const DeckVisualState& state, const ThemePalette& palette);
 
     // ------------------------------------------------------------------------
     // Libere les ressources graphiques dependantes du device.

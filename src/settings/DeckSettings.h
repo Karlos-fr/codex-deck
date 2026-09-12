@@ -7,10 +7,12 @@
 
 #pragma once
 
+#include "../theme/Theme.h"
+
 // ----------------------------------------------------------------------------
 // Regroupe les reglages locaux necessaires au bootstrap natif.
 // ----------------------------------------------------------------------------
 struct DeckSettings {
-    // Indique si la fenetre doit adopter le theme sombre pendant le bootstrap.
-    bool dark_theme = false;
+    // Mode de theme demande par l'utilisateur.
+    ThemeMode theme_mode = ThemeMode::System;
 };

@@ -23,7 +23,7 @@ int DeckApp::Run(HINSTANCE instance, int command_show) {
         return 1;
     }
 
-    ApplyDeckWindowTheme(hwnd, false);
+    RefreshTheme(hwnd);
     ShowWindow(hwnd, command_show);
     UpdateWindow(hwnd);
 
@@ -59,6 +59,7 @@ LRESULT CALLBACK DeckApp::WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPA
 LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
     switch (message) {
     case WM_CREATE:
+        RefreshTheme(hwnd);
         renderer_.Initialize(hwnd);
         return 0;
     case WM_SIZE:
@@ -94,9 +95,17 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
         PAINTSTRUCT paint{};
         BeginPaint(hwnd, &paint);
         EndPaint(hwnd, &paint);
-        renderer_.Render(hwnd, visual_state_);
+        renderer_.Render(hwnd, visual_state_, PaletteForTheme(resolved_theme_));
         return 0;
     }
+    case WM_SETTINGCHANGE:
+    case WM_THEMECHANGED:
+        if (settings_.theme_mode == ThemeMode::System) {
+            RefreshTheme(hwnd);
+            renderer_.DiscardDeviceResources();
+            InvalidateRect(hwnd, nullptr, FALSE);
+        }
+        return 0;
     case WM_ERASEBKGND:
         return 1;
     case WM_CLOSE:
@@ -109,4 +118,12 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
     default:
         return DefWindowProcW(hwnd, message, wparam, lparam);
     }
+}
+
+// ----------------------------------------------------------------------------
+// Recalcule le theme courant et applique les attributs systeme.
+// ----------------------------------------------------------------------------
+void DeckApp::RefreshTheme(HWND hwnd) {
+    resolved_theme_ = ResolveTheme(settings_.theme_mode, IsSystemDarkTheme());
+    ApplySystemWindowTheme(hwnd, resolved_theme_);
 }

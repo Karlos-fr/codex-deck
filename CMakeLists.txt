@@ -114,6 +114,7 @@ add_executable(CodexDeck WIN32
     src/main.cpp
     src/rendering/DeckRenderer.cpp
     src/resources/CodexDeck.rc
+    src/theme/Theme.cpp
     src/win32/SingleInstance.cpp
     src/window/DeckWindow.cpp
 )
@@ -226,4 +227,22 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CompositionSmokeT
     )
     target_link_libraries(CompositionSmokeTests PRIVATE d2d1 dcomp dwrite d3d11 dxgi user32)
     add_test(NAME CompositionSmokeTests COMMAND CompositionSmokeTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/ThemeTests.cpp")
+    add_executable(ThemeTests
+        tests/ThemeTests.cpp
+        src/theme/Theme.cpp
+    )
+    codex_deck_enable_cpp23(ThemeTests)
+    codex_deck_enable_msvc_defaults(ThemeTests)
+    target_include_directories(ThemeTests PRIVATE src)
+    target_compile_definitions(ThemeTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    target_link_libraries(ThemeTests PRIVATE d2d1 dwmapi advapi32 user32)
+    add_test(NAME ThemeTests COMMAND ThemeTests)
 endif()

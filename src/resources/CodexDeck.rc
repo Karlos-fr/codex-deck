@@ -4,8 +4,6 @@
 // Ce fichier fournit l'icone applicative et inclut les tables de chaines
 // localisees compilees dans l'executable. Les metadonnees de version Windows
 // sont generees par CMake depuis VersionInfo.rc.in.
-// Les fichiers inclus ci-dessous portent aussi les libelles du panneau couleurs
-// et du statut de rafraichissement anime, ainsi que les options de docking.
 // ============================================================================
 
 #include "ResourceIds.h"

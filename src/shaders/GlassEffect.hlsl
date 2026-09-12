@@ -1,8 +1,8 @@
 // ============================================================================
-// Codex Glass - GlassEffect Shader Reference
+// Codex Deck - Reference du shader GlassEffect
 // ----------------------------------------------------------------------------
-// Reference lisible du rendu GPU GlassEffect. Le shader execute est embarque
-// dans WidgetGlassEffectGpuProcessor afin que le binaire reste autonome.
+// Reference lisible du rendu GPU GlassEffect conservee pour les prochains
+// modules de rendu. Ce fichier n'est pas encore compile par la fondation.
 // ============================================================================
 
 Texture2D source_texture : register(t0);
@@ -190,6 +190,15 @@ float2 wave_offset(float2 pixel, float4 parameters, float liquid)
     return offset;
 }
 
+// ----------------------------------------------------------------------------
+// Combine les offsets d'eau actives pour le pixel courant.
+//
+// Parametres :
+// - pixel : position du pixel dans la texture cible.
+//
+// Retour :
+// - decalage de sampling en pixels apres attenuation des bords.
+// ----------------------------------------------------------------------------
 float2 water_offset(float2 pixel)
 {
     float2 offset = float2(0.0, 0.0);

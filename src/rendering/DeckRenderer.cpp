@@ -161,7 +161,7 @@ void DeckRenderer::Resize(HWND hwnd) {
 // ----------------------------------------------------------------------------
 // Dessine l'etat visuel courant.
 // ----------------------------------------------------------------------------
-void DeckRenderer::Render(HWND hwnd, const DeckVisualState& state) {
+void DeckRenderer::Render(HWND hwnd, const DeckVisualState& state, const ThemePalette& palette) {
     if (!Initialize(hwnd)) {
         return;
     }
@@ -173,21 +173,24 @@ void DeckRenderer::Render(HWND hwnd, const DeckVisualState& state) {
     ID2D1DeviceContext* context = *context_result;
     if (!impl_->background_brush) {
         context->CreateSolidColorBrush(
-            D2D1::ColorF(0.07F, 0.08F, 0.10F, 1.0F),
+            palette.window_background,
             impl_->background_brush.GetAddressOf()
         );
         context->CreateSolidColorBrush(
-            D2D1::ColorF(0.92F, 0.95F, 0.98F, 1.0F),
+            palette.text,
             impl_->title_brush.GetAddressOf()
         );
         context->CreateSolidColorBrush(
-            D2D1::ColorF(0.56F, 0.62F, 0.70F, 1.0F),
+            palette.text_muted,
             impl_->subtitle_brush.GetAddressOf()
         );
     }
 
     const D2D1_SIZE_F size = context->GetSize();
-    context->Clear(D2D1::ColorF(0.07F, 0.08F, 0.10F, 1.0F));
+    impl_->background_brush->SetColor(palette.window_background);
+    impl_->title_brush->SetColor(palette.text);
+    impl_->subtitle_brush->SetColor(palette.text_muted);
+    context->Clear(palette.window_background);
     context->FillRectangle(D2D1::RectF(0.0F, 0.0F, size.width, size.height), impl_->background_brush.Get());
     context->DrawTextW(
         state.title.c_str(),

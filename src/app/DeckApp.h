@@ -8,6 +8,8 @@
 #pragma once
 
 #include "../rendering/DeckRenderer.h"
+#include "../settings/DeckSettings.h"
+#include "../theme/Theme.h"
 
 #include <windows.h>
 
@@ -44,9 +46,20 @@ private:
     // ------------------------------------------------------------------------
     LRESULT HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 
+    // ------------------------------------------------------------------------
+    // Recalcule le theme courant et applique les attributs systeme.
+    // ------------------------------------------------------------------------
+    void RefreshTheme(HWND hwnd);
+
     // Renderer Direct2D minimal de la coquille.
     DeckRenderer renderer_;
 
     // Etat visuel affiche par le renderer.
     DeckVisualState visual_state_{};
+
+    // Reglages locaux de la coquille.
+    DeckSettings settings_{};
+
+    // Theme concret actuellement applique.
+    ResolvedTheme resolved_theme_ = ResolvedTheme::Light;
 };

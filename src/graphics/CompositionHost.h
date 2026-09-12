@@ -20,6 +20,19 @@
 class CompositionHost {
 public:
     // ------------------------------------------------------------------------
+    // Cree un hote sans allouer de ressources graphiques.
+    // ------------------------------------------------------------------------
+    CompositionHost() = default;
+
+    // ------------------------------------------------------------------------
+    // Libere les ressources graphiques possedees.
+    // ------------------------------------------------------------------------
+    ~CompositionHost();
+
+    CompositionHost(const CompositionHost&) = delete;
+    CompositionHost& operator=(const CompositionHost&) = delete;
+
+    // ------------------------------------------------------------------------
     // Initialise les devices graphiques et la cible DirectComposition.
     //
     // Parametres :
