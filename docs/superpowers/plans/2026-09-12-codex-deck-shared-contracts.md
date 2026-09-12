@@ -1,6 +1,6 @@
 # Codex Deck — Contrats transverses normatifs
 
-Ce document complète les plans d’implémentation V1 et **prend priorité sur une signature ou un détail de toolchain contradictoire dans un plan individuel**. Il ne constitue pas un septième chantier : il verrouille les interfaces partagées que tous les plans doivent respecter.
+Ce document complète les plans d’implémentation V1 et **prend priorité sur une signature ou un détail de toolchain contradictoire dans un plan individuel**. Il ne constitue pas un chantier supplémentaire : il verrouille les interfaces partagées que tous les plans doivent respecter.
 
 **Spec de référence :** `docs/superpowers/specs/2026-09-12-codex-deck-design.md`
 
@@ -88,7 +88,7 @@ using ThreadListCompletion = std::move_only_function<
 
 `thread/list` retourne les threads non archivés lorsque `archived` est `false` ou absent. Les archives nécessitent une requête avec `archived: true`.
 
-La façade utilise donc :
+La façade part de ce contrat minimal, étendu ensuite par le plan de cycle de vie :
 
 ```cpp
 struct ThreadListOptions {
@@ -99,7 +99,7 @@ struct ThreadListOptions {
 void ListThreads(ThreadListOptions options, ThreadListCompletion completion);
 ```
 
-Pour chaque appel, `CodexClient` suit automatiquement tous les `nextCursor` jusqu’à `null`.
+Pour chaque appel exhaustif, `CodexClient` suit automatiquement tous les `nextCursor` jusqu’à `null`.
 
 - La synchronisation de démarrage charge les threads **non archivés**.
 - La vue `Archive` charge les threads archivés à la demande avec `archived=true` et les met en cache mémoire tant que la vue est ouverte.
@@ -193,3 +193,34 @@ Pour concilier restauration fidèle et démarrage perçu rapide, l’ordre norma
 Les étapes 1–2 ne lancent **aucun** processus externe, Git, réseau ou parsing d’historique Codex. Elles doivent rester bornées au stockage local léger. En cas d’échec SQLite, afficher quand même la fenêtre avec un état par défaut puis signaler l’erreur localement.
 
 La fenêtre ne doit jamais attendre `codex app-server` ou une synchronisation réseau avant son premier affichage.
+
+## 11. Ouvrir une session interactive = `thread/resume`
+
+Une session ouverte dans un Workbench interactif doit être **reprise** afin que le client soit correctement rattaché à son runtime et à ses événements :
+
+```text
+OpenThread interactif
+  -> thread/resume {threadId, includeTurns:true}
+  -> CodexThreadDetail
+  -> TimelineDocument
+  -> notifications live
+```
+
+`thread/read(includeTurns=true)` est réservé aux lectures passives, aux previews et aux diagnostics qui ne doivent pas reprendre la session.
+
+En conséquence, si un plan Workbench mentionne `ReadThread` comme opération normale à la sélection, remplacer cette opération par `ResumeThread`. Le cache LRU peut réutiliser un document déjà repris tant que la connexion app-server n’a pas été invalidée. Après reconnexion, le document est marqué stale et le prochain accès interactif refait `thread/resume`.
+
+## 12. Synchronisation inter-clients
+
+Codex Deck possède son propre `app-server`; il ne faut donc pas supposer qu’une session créée/renommée dans VS Code ou CLI émettra une notification live sur la connexion de Deck.
+
+La détection inter-clients se fait par `thread/list` :
+
+- probe immédiat lors du retour de Codex Deck au premier plan ;
+- probe périodique toutes les 15 s au premier plan ;
+- probe périodique toutes les 60 s en arrière-plan ;
+- jamais deux probes/syncs en parallèle ; les demandes concurrentes sont coalescées.
+
+Pour privilégier la correction des métadonnées, le probe périodique utilise le comportement normal scan-and-repair de `thread/list` : **`useStateDbOnly=false`**. Un plan individuel qui propose `useStateDbOnly=true` pour ce probe est surchargé par cette règle. Le probe reste borné aux 100 threads les plus récents triés par `recency_at desc`; un fingerprint différent déclenche ensuite la synchronisation exhaustive non archivée.
+
+Aucun fichier interne Codex n’est lu pour détecter ces changements.
