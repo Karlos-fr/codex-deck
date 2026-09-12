@@ -155,7 +155,7 @@ git commit -m "feat: add Codex Deck SQLite schema"
 - Produces: `ProjectRepository::{Create, List, AddRoot, SetGitRemote, Delete}`.
 - Produces: `SessionMetadataRepository::{Get, UpsertCache, SetAssignment, SetFavorite, ListAll}`.
 
-- [ ] **Step 1: Définir les types**
+- [x] **Step 1: Définir les types**
 
 ```cpp
 using ProjectId = std::int64_t;
@@ -183,17 +183,17 @@ struct SessionMetadata {
 };
 ```
 
-- [ ] **Step 2: Écrire les tests transactionnels**
+- [x] **Step 2: Écrire les tests transactionnels**
 
 Cas projet : créer `SpotifyAmp`, ajouter deux roots, relire, supprimer et vérifier cascade roots.
 
 Cas session : upsert cache, assignation auto, puis assignation manuelle vers un autre projet ; relire et vérifier `Manual`.
 
-- [ ] **Step 3: Implémenter les repositories avec statements préparés**
+- [x] **Step 3: Implémenter les repositories avec statements préparés**
 
 Aucune concaténation SQL de valeurs utilisateur. Les opérations multi-table `Create` + roots utilisent `BEGIN IMMEDIATE` / `COMMIT` avec rollback RAII en erreur.
 
-- [ ] **Step 4: Ajouter normalisation de chemin**
+- [x] **Step 4: Ajouter normalisation de chemin**
 
 Créer dans `ProjectRepository.cpp` une fonction privée réutilisable via `src/projects/PathNormalization.h/.cpp` :
 
@@ -203,7 +203,7 @@ std::wstring NormalizeWindowsPath(const std::filesystem::path& path);
 
 Règles : `weakly_canonical` si possible, séparateurs `\`, suppression du slash terminal hors racine, conversion en minuscules via `LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_LOWERCASE, ...)`.
 
-- [ ] **Step 5: Valider et commit**
+- [x] **Step 5: Valider et commit**
 
 ```powershell
 ctest --preset debug -R "ProjectRepositoryTests|SessionMetadataRepositoryTests" --output-on-failure

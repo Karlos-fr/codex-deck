@@ -428,3 +428,46 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/storage/SqliteDat
     target_link_libraries(SqliteDatabaseTests PRIVATE sqlite3)
     add_test(NAME SqliteDatabaseTests COMMAND SqliteDatabaseTests)
 endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/projects/ProjectRepositoryTests.cpp")
+    add_executable(ProjectRepositoryTests
+        tests/projects/ProjectRepositoryTests.cpp
+        src/projects/PathNormalization.cpp
+        src/projects/ProjectRepository.cpp
+        src/storage/SchemaMigrator.cpp
+        src/storage/SqliteDatabase.cpp
+    )
+    codex_deck_enable_cpp23(ProjectRepositoryTests)
+    codex_deck_enable_msvc_defaults(ProjectRepositoryTests)
+    target_include_directories(ProjectRepositoryTests PRIVATE src)
+    target_compile_definitions(ProjectRepositoryTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    target_link_libraries(ProjectRepositoryTests PRIVATE sqlite3 nlohmann_json::nlohmann_json)
+    add_test(NAME ProjectRepositoryTests COMMAND ProjectRepositoryTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/storage/SessionMetadataRepositoryTests.cpp")
+    add_executable(SessionMetadataRepositoryTests
+        tests/storage/SessionMetadataRepositoryTests.cpp
+        src/projects/PathNormalization.cpp
+        src/projects/ProjectRepository.cpp
+        src/storage/SchemaMigrator.cpp
+        src/storage/SessionMetadataRepository.cpp
+        src/storage/SqliteDatabase.cpp
+    )
+    codex_deck_enable_cpp23(SessionMetadataRepositoryTests)
+    codex_deck_enable_msvc_defaults(SessionMetadataRepositoryTests)
+    target_include_directories(SessionMetadataRepositoryTests PRIVATE src)
+    target_compile_definitions(SessionMetadataRepositoryTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    target_link_libraries(SessionMetadataRepositoryTests PRIVATE sqlite3 nlohmann_json::nlohmann_json)
+    add_test(NAME SessionMetadataRepositoryTests COMMAND SessionMetadataRepositoryTests)
+endif()
