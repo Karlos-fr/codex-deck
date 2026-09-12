@@ -491,3 +491,41 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/projects/ProjectD
     target_link_libraries(ProjectDetectorTests PRIVATE nlohmann_json::nlohmann_json)
     add_test(NAME ProjectDetectorTests COMMAND ProjectDetectorTests)
 endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/model/SessionCatalogTests.cpp")
+    add_executable(SessionCatalogTests
+        tests/model/SessionCatalogTests.cpp
+        src/model/SessionCatalog.cpp
+    )
+    codex_deck_enable_cpp23(SessionCatalogTests)
+    codex_deck_enable_msvc_defaults(SessionCatalogTests)
+    target_include_directories(SessionCatalogTests PRIVATE src)
+    target_link_libraries(SessionCatalogTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME SessionCatalogTests COMMAND SessionCatalogTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/sync/SessionSyncTests.cpp")
+    add_executable(SessionSyncTests
+        tests/sync/SessionSyncTests.cpp
+        src/model/SessionCatalog.cpp
+        src/projects/GitProjectProbe.cpp
+        src/projects/PathNormalization.cpp
+        src/projects/ProjectDetector.cpp
+        src/projects/ProjectRepository.cpp
+        src/storage/SchemaMigrator.cpp
+        src/storage/SessionMetadataRepository.cpp
+        src/storage/SqliteDatabase.cpp
+        src/sync/SessionSyncService.cpp
+    )
+    codex_deck_enable_cpp23(SessionSyncTests)
+    codex_deck_enable_msvc_defaults(SessionSyncTests)
+    target_include_directories(SessionSyncTests PRIVATE src)
+    target_compile_definitions(SessionSyncTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    target_link_libraries(SessionSyncTests PRIVATE sqlite3 nlohmann_json::nlohmann_json)
+    add_test(NAME SessionSyncTests COMMAND SessionSyncTests)
+endif()

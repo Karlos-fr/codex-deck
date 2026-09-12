@@ -298,7 +298,7 @@ git commit -m "feat: detect logical projects from Codex workspaces"
 - Produces: `SessionCatalogSnapshot` immutable par valeur.
 - Produces: `SessionSyncService::LoadCachedState()` puis `RefreshFromCodex()`.
 
-- [ ] **Step 1: Définir le record fusionné**
+- [x] **Step 1: Définir le record fusionné**
 
 ```cpp
 struct SessionRecord {
@@ -317,11 +317,11 @@ struct SessionCatalogSnapshot {
 };
 ```
 
-- [ ] **Step 2: Écrire le test de démarrage cache-first**
+- [x] **Step 2: Écrire le test de démarrage cache-first**
 
 Précharger SQLite avec deux sessions. `LoadCachedState()` doit publier immédiatement un snapshot contenant les deux sessions, `present_in_codex=false`, avant tout appel à `CodexClient`.
 
-- [ ] **Step 3: Écrire le test de réconciliation**
+- [x] **Step 3: Écrire le test de réconciliation**
 
 Fake Codex renvoie : session A renommée, session B absente, session C nouvelle. Vérifier :
 
@@ -331,11 +331,11 @@ B -> reste en cache mais present_in_codex=false et n'est pas affichable comme se
 C -> créée, projet auto détecté ou Unassigned
 ```
 
-- [ ] **Step 4: Implémenter `SessionCatalog` thread-safe**
+- [x] **Step 4: Implémenter `SessionCatalog` thread-safe**
 
 Toutes les mutations sont réalisées sur le worker de sync ; la publication UI se fait par copie/move d’un `std::shared_ptr<const SessionCatalogSnapshot>` avec revision monotone. Aucun objet SQLite ne fuit vers l’UI.
 
-- [ ] **Step 5: Implémenter `SessionSyncService`**
+- [x] **Step 5: Implémenter `SessionSyncService`**
 
 Ordre :
 
@@ -352,11 +352,11 @@ RefreshFromCodex
   -> publication nouvelle revision
 ```
 
-- [ ] **Step 6: Brancher `OnResyncRequired` du supervisor**
+- [x] **Step 6: Brancher `OnResyncRequired` du supervisor**
 
 Après reconnexion app-server, déclencher `RefreshFromCodex()` ; si une sync est déjà active, poser un booléen `refresh_requested_again` et effectuer un second passage unique à la fin plutôt que lancer deux scans concurrents.
 
-- [ ] **Step 7: Valider et commit**
+- [x] **Step 7: Valider et commit**
 
 ```powershell
 ctest --preset debug -R "SessionCatalogTests|SessionSyncTests" --output-on-failure
