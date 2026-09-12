@@ -259,18 +259,18 @@ git commit -m "feat: launch Codex app-server as supervised child process"
 - Produces: `SendResponse(server_request_id, result)`.
 - Produces: callbacks `OnNotification`, `OnServerRequest`, `OnDisconnected`.
 
-- [ ] **Step 1: Écrire le test d’entrelacement**
+- [x] **Step 1: Écrire le test d’entrelacement**
 
 Scénario : envoyer deux requests, faire répondre le fake dans l’ordre inverse, injecter une notification entre les deux, puis vérifier que chaque completion reçoit le bon `id` et que la notification est livrée séparément.
 
-- [ ] **Step 2: Vérifier l’échec**
+- [x] **Step 2: Vérifier l’échec**
 
 ```powershell
 cmake --build --preset debug
 ctest --preset debug -R JsonRpcTransportTests --output-on-failure
 ```
 
-- [ ] **Step 3: Définir le transport**
+- [x] **Step 3: Définir le transport**
 
 `JsonRpcTransport` possède :
 
@@ -290,7 +290,7 @@ public:
 
 Un `std::jthread` lit les lignes. L’écriture est sérialisée par mutex. La map des requests pendantes est protégée par mutex et vidée avec `Disconnected` à l’arrêt inattendu.
 
-- [ ] **Step 4: Construire les enveloppes JSON-RPC**
+- [x] **Step 4: Construire les enveloppes JSON-RPC**
 
 Request :
 
@@ -306,7 +306,7 @@ Réponse à server request :
 
 Toujours écrire `dump()` + `"\n"` puis flush du handle via `WriteFile` complet, en gérant les écritures partielles.
 
-- [ ] **Step 5: Valider et commit**
+- [x] **Step 5: Valider et commit**
 
 ```powershell
 cmake --build --preset debug
