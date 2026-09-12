@@ -176,3 +176,20 @@ Les seuls travaux autorisés directement dans le thread fenêtre sont :
 - publication de commandes vers les services.
 
 Process, pipes, RPC, parsing de gros payloads, SQLite, détection Git et recherche globale volumineuse restent hors thread UI.
+
+## 10. Ordre de démarrage cache-first
+
+Pour concilier restauration fidèle et démarrage perçu rapide, l’ordre normatif est :
+
+```text
+1. résoudre %LOCALAPPDATA% et ouvrir/migrer la petite base SQLite locale
+2. lire WorkspaceState + cache léger projets/sessions
+3. créer puis ShowWindow avec position, thème et cache restaurés
+4. démarrer CodexSupervisor sur worker
+5. à Connected, lancer la synchronisation Codex
+6. après premier catalogue réconcilié, restaurer les Workbenches détachés encore valides
+```
+
+Les étapes 1–2 ne lancent **aucun** processus externe, Git, réseau ou parsing d’historique Codex. Elles doivent rester bornées au stockage local léger. En cas d’échec SQLite, afficher quand même la fenêtre avec un état par défaut puis signaler l’erreur localement.
+
+La fenêtre ne doit jamais attendre `codex app-server` ou une synchronisation réseau avant son premier affichage.
