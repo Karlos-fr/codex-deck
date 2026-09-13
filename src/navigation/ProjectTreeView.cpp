@@ -40,7 +40,7 @@ constexpr float kTreeIndent = 16.0F;
 // Taille du point de statut.
 constexpr float kStatusDotRadius = 2.6F;
 
-// Decalage vertical pour centrer le texte.
+// Decalage vertical du layout DirectWrite dans la ligne centree.
 constexpr float kTextTopPadding = 0.0F;
 
 // Marge horizontale de la selection active.
@@ -49,8 +49,8 @@ constexpr float kSelectionInsetX = 6.0F;
 // Marge verticale de la selection active.
 constexpr float kSelectionInsetY = 3.0F;
 
-// Correction optique verticale du fond de selection et de survol.
-constexpr float kSelectionOffsetY = 2.0F;
+// Decalage optique du fond pour laisser respirer les jambages inferieurs.
+constexpr float kSelectionOffsetY = 4.0F;
 
 // Rayon de la selection active.
 constexpr float kSelectionRadius = 6.0F;

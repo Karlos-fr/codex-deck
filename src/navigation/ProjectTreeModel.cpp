@@ -125,15 +125,18 @@ TreeRow MoreRow(ProjectId project_id, std::size_t hidden_count) {
 // ----------------------------------------------------------------------------
 // Cree l'en-tete fixe Unassigned.
 //
+// Parametres :
+// - expanded : indique si les sessions non assignees sont visibles.
+//
 // Retour :
 // - ligne d'en-tete.
 // ----------------------------------------------------------------------------
-TreeRow UnassignedHeaderRow() {
+TreeRow UnassignedHeaderRow(bool expanded) {
     TreeRow row{};
     row.kind = TreeRowKind::UnassignedHeader;
     row.stable_id = "unassigned";
     row.primary_text = L"Unassigned";
-    row.expanded = true;
+    row.expanded = expanded;
     return row;
 }
 
@@ -172,7 +175,7 @@ std::vector<TreeRow> BuildProjectTreeRows(
         }
     }
 
-    rows.push_back(UnassignedHeaderRow());
+    rows.push_back(UnassignedHeaderRow(state.unassigned_expanded));
     if (state.unassigned_expanded) {
         for (const SessionRecord& session : ordered.unassigned) {
             rows.push_back(SessionRow(session, 1));

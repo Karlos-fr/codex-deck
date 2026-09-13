@@ -100,7 +100,7 @@ int TestInitialRows() {
     if (rows[10].kind != TreeRowKind::Project || rows[10].project_id != 1) {
         return 6;
     }
-    if (rows[12].kind != TreeRowKind::UnassignedHeader || rows[12].stable_id != "unassigned") {
+    if (rows[12].kind != TreeRowKind::UnassignedHeader || rows[12].stable_id != "unassigned" || !rows[12].expanded) {
         return 7;
     }
     if (rows[13].kind != TreeRowKind::Session || rows[13].thread_id != "u-new") {
@@ -143,6 +143,25 @@ int TestMoreExpansion() {
 }
 
 // ----------------------------------------------------------------------------
+// Verifie que la categorie Unassigned expose son etat replie.
+//
+// Retour :
+// - zero si le chevron ferme et les enfants masques sont demandes.
+// ----------------------------------------------------------------------------
+int TestUnassignedCollapsed() {
+    SessionCatalogSnapshot catalog{};
+    catalog.sessions.push_back(MakeSession("loose", "Loose", std::nullopt, 1));
+
+    ProjectTreeState state{};
+    state.unassigned_expanded = false;
+    const auto rows = BuildProjectTreeRows(catalog, state);
+    if (rows.size() != 1) {
+        return 23;
+    }
+    return rows[0].kind == TreeRowKind::UnassignedHeader && !rows[0].expanded ? 0 : 24;
+}
+
+// ----------------------------------------------------------------------------
 // Execute les tests de modele Tree.
 //
 // Retour :
@@ -153,6 +172,9 @@ int main() {
         return result;
     }
     if (const int result = TestMoreExpansion(); result != 0) {
+        return result;
+    }
+    if (const int result = TestUnassignedCollapsed(); result != 0) {
         return result;
     }
     SessionCatalogSnapshot utf8_catalog{};
