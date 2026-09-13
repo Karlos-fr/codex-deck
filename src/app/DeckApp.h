@@ -79,7 +79,7 @@ private:
     // Parametres :
     // - client : client app-server connecte.
     // ------------------------------------------------------------------------
-    void RefreshSessionsFromCodex(CodexClient& client);
+    void RefreshSessionsFromCodex(CodexClient& client, HWND hwnd);
 
     // Renderer Direct2D minimal de la coquille.
     DeckRenderer renderer_;

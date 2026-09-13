@@ -63,5 +63,11 @@ int main() {
     if (!NearlyEqual(Width(ComputeMainLayout(SizeF{1000.0F, 700.0F}, 100.0F, 42.0F, 100.0F).tree), 220.0F)) {
         return 5;
     }
-    return NearlyEqual(Width(ComputeMainLayout(SizeF{1000.0F, 700.0F}, 900.0F, 42.0F, 100.0F).tree), 480.0F) ? 0 : 6;
+    if (!NearlyEqual(Width(ComputeMainLayout(SizeF{1000.0F, 700.0F}, 900.0F, 42.0F, 100.0F).tree), 480.0F)) {
+        return 6;
+    }
+    if (!HitTestMainSplitter(rects, 298.0F) || !HitTestMainSplitter(rects, 304.0F)) {
+        return 7;
+    }
+    return HitTestMainSplitter(rects, 320.0F) ? 8 : 0;
 }

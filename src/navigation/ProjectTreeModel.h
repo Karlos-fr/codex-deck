@@ -11,6 +11,7 @@
 
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -64,6 +65,9 @@ struct TreeRow {
 
     // Nombre de sessions masquees pour une ligne More.
     std::size_t hidden_count = 0;
+
+    // Indique si une section depliable est ouverte.
+    bool expanded = false;
 };
 
 // ----------------------------------------------------------------------------
@@ -78,6 +82,9 @@ struct ProjectTreeState {
 
     // Session selectionnee dans le Tree.
     std::optional<CodexThreadId> selected_thread;
+
+    // Nombre de sessions visibles demande par projet.
+    std::unordered_map<ProjectId, std::size_t> visible_sessions_by_project;
 };
 
 // ----------------------------------------------------------------------------

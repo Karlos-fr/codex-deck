@@ -8,6 +8,7 @@
 #include "MainLayout.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace {
 
@@ -18,7 +19,10 @@ constexpr float kMinimumTreeWidth = 220.0F;
 constexpr float kMaximumTreeWidth = 480.0F;
 
 // Largeur visuelle du separateur.
-constexpr float kSplitterWidth = 4.0F;
+constexpr float kSplitterWidth = 1.0F;
+
+// Largeur de hit du separateur.
+constexpr float kSplitterHitWidth = 8.0F;
 
 }  // namespace
 
@@ -56,4 +60,12 @@ MainLayoutRects ComputeMainLayout(
         height
     };
     return rects;
+}
+
+// ----------------------------------------------------------------------------
+// Indique si une position horizontale touche le separateur principal.
+// ----------------------------------------------------------------------------
+bool HitTestMainSplitter(const MainLayoutRects& rects, float x) {
+    const float center = (rects.splitter.left + rects.splitter.right) * 0.5F;
+    return std::abs(x - center) <= kSplitterHitWidth * 0.5F;
 }

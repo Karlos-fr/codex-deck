@@ -84,3 +84,15 @@ MainLayoutRects ComputeMainLayout(
 // - largeur bornee.
 // ----------------------------------------------------------------------------
 float ClampTreeWidth(float tree_width);
+
+// ----------------------------------------------------------------------------
+// Indique si une position horizontale touche le separateur principal.
+//
+// Parametres :
+// - rects : rectangles calcules du layout.
+// - x : position horizontale en DIPs.
+//
+// Retour :
+// - true si la position est dans la zone de hit elargie du separateur.
+// ----------------------------------------------------------------------------
+bool HitTestMainSplitter(const MainLayoutRects& rects, float x);

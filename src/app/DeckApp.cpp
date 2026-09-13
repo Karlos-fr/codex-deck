@@ -18,6 +18,25 @@
 
 #include <vector>
 
+namespace {
+
+// Message prive demandant un repaint apres publication du catalogue.
+constexpr UINT WM_CODEX_DECK_CATALOG_UPDATED = WM_APP + 1;
+
+// Identifiant du timer surveillant le premier snapshot cache.
+constexpr UINT_PTR kCatalogWarmupTimer = 1;
+
+// Identifiant du timer d'animation UI.
+constexpr UINT_PTR kUiAnimationTimer = 2;
+
+// Delai du timer de premier snapshot cache.
+constexpr UINT kCatalogWarmupTimerMs = 250;
+
+// Cadence du timer d'animation UI.
+constexpr UINT kUiAnimationTimerMs = 16;
+
+}  // namespace
+
 // ----------------------------------------------------------------------------
 // Libere les ressources applicatives possedees.
 // ----------------------------------------------------------------------------
@@ -39,11 +58,11 @@ int DeckApp::Run(HINSTANCE instance, int command_show) {
     ShowWindow(hwnd, command_show);
     UpdateWindow(hwnd);
     StartStorageWorker();
-    codex_supervisor_.SetConnectedClientHandler([this](CodexClient& client) {
-        RefreshSessionsFromCodex(client);
+    codex_supervisor_.SetConnectedClientHandler([this, hwnd](CodexClient& client) {
+        RefreshSessionsFromCodex(client, hwnd);
     });
-    codex_supervisor_.SetResyncRequiredHandler([this](CodexClient& client) {
-        RefreshSessionsFromCodex(client);
+    codex_supervisor_.SetResyncRequiredHandler([this, hwnd](CodexClient& client) {
+        RefreshSessionsFromCodex(client, hwnd);
     });
     codex_supervisor_.Start();
 
@@ -78,10 +97,28 @@ LRESULT CALLBACK DeckApp::WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPA
 // ----------------------------------------------------------------------------
 LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
     switch (message) {
+    case WM_CODEX_DECK_CATALOG_UPDATED:
+        InvalidateRect(hwnd, nullptr, FALSE);
+        return 0;
     case WM_CREATE:
         RefreshTheme(hwnd);
         renderer_.Initialize(hwnd);
+        SetTimer(hwnd, kCatalogWarmupTimer, kCatalogWarmupTimerMs, nullptr);
+        SetTimer(hwnd, kUiAnimationTimer, kUiAnimationTimerMs, nullptr);
         return 0;
+    case WM_TIMER:
+        if (wparam == kCatalogWarmupTimer && session_catalog_.Current()) {
+            KillTimer(hwnd, kCatalogWarmupTimer);
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        }
+        if (wparam == kUiAnimationTimer) {
+            if (renderer_.AdvanceAnimations()) {
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
+            return 0;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_SIZE:
         if (wparam != SIZE_MINIMIZED) {
             renderer_.Resize(hwnd);
@@ -101,14 +138,29 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
         );
         InvalidateRect(hwnd, nullptr, FALSE);
         return 0;
-    case WM_MOUSEMOVE:
-        if ((wparam & MK_LBUTTON) != 0) {
-            renderer_.OnPointerMove(
+    case WM_MOUSEMOVE: {
+        TRACKMOUSEEVENT tracking{};
+        tracking.cbSize = sizeof(tracking);
+        tracking.dwFlags = TME_LEAVE;
+        tracking.hwndTrack = hwnd;
+        TrackMouseEvent(&tracking);
+        if (renderer_.IsPointOnSplitter(
                 static_cast<float>(GET_X_LPARAM(lparam)),
                 static_cast<float>(GET_Y_LPARAM(lparam))
-            );
-            InvalidateRect(hwnd, nullptr, FALSE);
+            )) {
+            SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
         }
+        renderer_.OnPointerMove(
+            static_cast<float>(GET_X_LPARAM(lparam)),
+            static_cast<float>(GET_Y_LPARAM(lparam))
+        );
+        renderer_.AdvanceAnimations();
+        InvalidateRect(hwnd, nullptr, FALSE);
+        return 0;
+    }
+    case WM_MOUSELEAVE:
+        renderer_.OnPointerLeave();
+        InvalidateRect(hwnd, nullptr, FALSE);
         return 0;
     case WM_LBUTTONUP:
         renderer_.OnPointerUp(
@@ -118,6 +170,16 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
         ReleaseCapture();
         InvalidateRect(hwnd, nullptr, FALSE);
         return 0;
+    case WM_SETCURSOR: {
+        POINT point{};
+        GetCursorPos(&point);
+        ScreenToClient(hwnd, &point);
+        if (renderer_.IsPointOnSplitter(static_cast<float>(point.x), static_cast<float>(point.y))) {
+            SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
+            return TRUE;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
+    }
     case WM_KEYDOWN:
         if (renderer_.OnKeyDown(wparam)) {
             InvalidateRect(hwnd, nullptr, FALSE);
@@ -157,7 +219,7 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
         PAINTSTRUCT paint{};
         BeginPaint(hwnd, &paint);
         EndPaint(hwnd, &paint);
-        renderer_.Render(hwnd, visual_state_, PaletteForTheme(resolved_theme_));
+        renderer_.Render(hwnd, visual_state_, PaletteForTheme(resolved_theme_), session_catalog_.Current());
         return 0;
     }
     case WM_SETTINGCHANGE:
@@ -174,6 +236,8 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
         DestroyWindow(hwnd);
         return 0;
     case WM_DESTROY:
+        KillTimer(hwnd, kCatalogWarmupTimer);
+        KillTimer(hwnd, kUiAnimationTimer);
         codex_supervisor_.Stop();
         StopStorageWorker();
         renderer_.DiscardDeviceResources();
@@ -261,8 +325,8 @@ void DeckApp::RequestSessionRefresh() {
 // ----------------------------------------------------------------------------
 // Rafraichit le catalogue depuis un client Codex connecte.
 // ----------------------------------------------------------------------------
-void DeckApp::RefreshSessionsFromCodex(CodexClient& client) {
-    client.ListThreads(ThreadListOptions{}, [this](std::expected<std::vector<CodexThreadSummary>, CodexError> response) mutable {
+void DeckApp::RefreshSessionsFromCodex(CodexClient& client, HWND hwnd) {
+    client.ListThreads(ThreadListOptions{}, [this, hwnd](std::expected<std::vector<CodexThreadSummary>, CodexError> response) mutable {
         if (!response || storage_stopping_) {
             return;
         }
@@ -284,5 +348,6 @@ void DeckApp::RefreshSessionsFromCodex(CodexClient& client) {
             return std::expected<std::vector<CodexThreadSummary>, CodexError>{std::move(threads)};
         });
         [[maybe_unused]] const auto refreshed = sync_service.RequestRefreshFromCodex();
+        PostMessageW(hwnd, WM_CODEX_DECK_CATALOG_UPDATED, 0, 0);
     });
 }

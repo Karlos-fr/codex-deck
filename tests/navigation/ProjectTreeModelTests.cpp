@@ -61,7 +61,7 @@ SessionRecord MakeSession(
 // Retour :
 // - zero si les lignes respectent le contrat du plan.
 // ----------------------------------------------------------------------------
-int main() {
+int TestInitialRows() {
     SessionCatalogSnapshot catalog{};
     catalog.projects.push_back(MakeProject(1, "Older"));
     catalog.projects.push_back(MakeProject(2, "Recent"));
@@ -107,4 +107,59 @@ int main() {
         return 8;
     }
     return rows[14].kind == TreeRowKind::Session && rows[14].thread_id == "u-old" ? 0 : 9;
+}
+
+// ----------------------------------------------------------------------------
+// Verifie qu'une ligne More peut reveler les sessions suivantes.
+//
+// Retour :
+// - zero si la limite par projet est surchargee par l'etat.
+// ----------------------------------------------------------------------------
+int TestMoreExpansion() {
+    SessionCatalogSnapshot catalog{};
+    catalog.projects.push_back(MakeProject(7, "Expandable"));
+    for (int index = 0; index < 12; ++index) {
+        catalog.sessions.push_back(MakeSession(
+            "p7-" + std::to_string(index),
+            "Session " + std::to_string(index),
+            7,
+            100 - index
+        ));
+    }
+
+    ProjectTreeState state{};
+    state.expanded_projects.insert(7);
+    state.visible_sessions_by_project[7] = 12;
+    const auto rows = BuildProjectTreeRows(catalog, state);
+    if (rows.size() != 14) {
+        return 20;
+    }
+    for (const TreeRow& row : rows) {
+        if (row.kind == TreeRowKind::More) {
+            return 21;
+        }
+    }
+    return rows[12].kind == TreeRowKind::Session && rows[12].thread_id == "p7-11" ? 0 : 22;
+}
+
+// ----------------------------------------------------------------------------
+// Execute les tests de modele Tree.
+//
+// Retour :
+// - zero si tous les scenarios passent.
+// ----------------------------------------------------------------------------
+int main() {
+    if (const int result = TestInitialRows(); result != 0) {
+        return result;
+    }
+    if (const int result = TestMoreExpansion(); result != 0) {
+        return result;
+    }
+    SessionCatalogSnapshot utf8_catalog{};
+    utf8_catalog.sessions.push_back(MakeSession("utf8", "Campagne compl\xC3\xA8te", std::nullopt, 1));
+    const auto utf8_rows = BuildProjectTreeRows(utf8_catalog, ProjectTreeState{});
+    if (utf8_rows.size() < 2 || utf8_rows[1].primary_text != L"Campagne compl\x00E8te") {
+        return 30;
+    }
+    return 0;
 }

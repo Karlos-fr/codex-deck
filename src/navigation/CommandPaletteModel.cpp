@@ -9,6 +9,11 @@
 
 #include "../search/FuzzyMatcher.h"
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+
 #include <algorithm>
 #include <array>
 #include <unordered_map>
@@ -16,7 +21,7 @@
 namespace {
 
 // ----------------------------------------------------------------------------
-// Convertit une chaine ASCII/UTF-8 simple en wide.
+// Convertit une chaine UTF-8 en wide.
 //
 // Parametres :
 // - text : texte source.
@@ -24,12 +29,35 @@ namespace {
 // Retour :
 // - texte wide.
 // ----------------------------------------------------------------------------
-std::wstring WidenAscii(std::string_view text) {
-    std::wstring wide;
-    wide.reserve(text.size());
-    for (const char character : text) {
-        wide.push_back(static_cast<wchar_t>(static_cast<unsigned char>(character)));
+std::wstring WidenUtf8(std::string_view text) {
+    if (text.empty()) {
+        return {};
     }
+    const int required = MultiByteToWideChar(
+        CP_UTF8,
+        MB_ERR_INVALID_CHARS,
+        text.data(),
+        static_cast<int>(text.size()),
+        nullptr,
+        0
+    );
+    if (required <= 0) {
+        std::wstring fallback;
+        fallback.reserve(text.size());
+        for (const char character : text) {
+            fallback.push_back(static_cast<wchar_t>(static_cast<unsigned char>(character)));
+        }
+        return fallback;
+    }
+    std::wstring wide(static_cast<std::size_t>(required), L'\0');
+    MultiByteToWideChar(
+        CP_UTF8,
+        MB_ERR_INVALID_CHARS,
+        text.data(),
+        static_cast<int>(text.size()),
+        wide.data(),
+        required
+    );
     return wide;
 }
 
@@ -130,17 +158,17 @@ std::vector<PaletteEntry> BuildCommandPaletteEntries(
     entries.reserve(snapshot.projects.size() + snapshot.sessions.size() + kActions.size());
     std::unordered_map<ProjectId, std::wstring> project_names;
     for (const Project& project : snapshot.projects) {
-        project_names.emplace(project.id, WidenAscii(project.name));
+        project_names.emplace(project.id, WidenUtf8(project.name));
     }
 
     for (const SessionRecord& session : snapshot.sessions) {
         PaletteEntry entry{};
         entry.kind = PaletteEntryKind::Session;
         entry.id = "session:" + session.codex.id;
-        entry.title = WidenAscii(session.codex.name.empty() ? session.codex.id : session.codex.name);
+        entry.title = WidenUtf8(session.codex.name.empty() ? session.codex.id : session.codex.name);
         entry.subtitle = L"SESSIONS";
         entry.command = DeckCommand{DeckCommandKind::OpenThread, session.project_id, session.codex.id};
-        std::wstring haystack = entry.title + L" " + WidenAscii(session.codex.id);
+        std::wstring haystack = entry.title + L" " + WidenUtf8(session.codex.id);
         if (session.project_id) {
             if (const auto project = project_names.find(*session.project_id); project != project_names.end()) {
                 haystack += L" " + project->second;
@@ -153,7 +181,7 @@ std::vector<PaletteEntry> BuildCommandPaletteEntries(
         PaletteEntry entry{};
         entry.kind = PaletteEntryKind::Project;
         entry.id = "project:" + std::to_string(project.id);
-        entry.title = WidenAscii(project.name);
+        entry.title = WidenUtf8(project.name);
         entry.subtitle = L"PROJECTS";
         entry.command = DeckCommand{DeckCommandKind::OpenWorkspace, project.id, std::nullopt};
         const std::wstring haystack = entry.title;

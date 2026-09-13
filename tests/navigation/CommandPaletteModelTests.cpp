@@ -75,5 +75,15 @@ int main() {
     if (actions.empty() || actions.front().kind != PaletteEntryKind::Action) {
         return 4;
     }
-    return actions.front().command.kind == DeckCommandKind::NewSession ? 0 : 5;
+    if (actions.front().command.kind != DeckCommandKind::NewSession) {
+        return 5;
+    }
+
+    SessionCatalogSnapshot utf8_snapshot{};
+    utf8_snapshot.sessions.push_back(MakeSession("utf8", "Campagne compl\xC3\xA8te", std::nullopt));
+    const auto utf8_entries = BuildCommandPaletteEntries(utf8_snapshot, L"compl");
+    if (utf8_entries.empty() || utf8_entries.front().title != L"Campagne compl\x00E8te") {
+        return 6;
+    }
+    return 0;
 }

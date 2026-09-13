@@ -143,6 +143,8 @@ add_executable(CodexDeck WIN32
     src/search/FuzzyMatcher.cpp
     src/ui/MainLayout.cpp
     src/ui/ScrollState.cpp
+    src/ui/ScrollbarGeometry.cpp
+    src/ui/TreeVisualAnimation.cpp
     src/ui/VirtualListLayout.cpp
     src/theme/Theme.cpp
     src/win32/SingleInstance.cpp
@@ -722,4 +724,26 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/MainLayoutTest
     codex_deck_enable_msvc_defaults(MainLayoutTests)
     target_include_directories(MainLayoutTests PRIVATE src)
     add_test(NAME MainLayoutTests COMMAND MainLayoutTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/ScrollbarGeometryTests.cpp")
+    add_executable(ScrollbarGeometryTests
+        tests/ui/ScrollbarGeometryTests.cpp
+        src/ui/ScrollbarGeometry.cpp
+    )
+    codex_deck_enable_cpp23(ScrollbarGeometryTests)
+    codex_deck_enable_msvc_defaults(ScrollbarGeometryTests)
+    target_include_directories(ScrollbarGeometryTests PRIVATE src)
+    add_test(NAME ScrollbarGeometryTests COMMAND ScrollbarGeometryTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/ui/TreeVisualAnimationTests.cpp")
+    add_executable(TreeVisualAnimationTests
+        tests/ui/TreeVisualAnimationTests.cpp
+        src/ui/TreeVisualAnimation.cpp
+    )
+    codex_deck_enable_cpp23(TreeVisualAnimationTests)
+    codex_deck_enable_msvc_defaults(TreeVisualAnimationTests)
+    target_include_directories(TreeVisualAnimationTests PRIVATE src)
+    add_test(NAME TreeVisualAnimationTests COMMAND TreeVisualAnimationTests)
 endif()

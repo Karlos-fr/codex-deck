@@ -11,12 +11,14 @@
 
 #include "../theme/ThemePalette.h"
 #include "../ui/ScrollState.h"
+#include "../ui/TreeVisualAnimation.h"
 
 #include <d2d1_1.h>
 #include <dwrite.h>
 
 #include <functional>
 #include <memory>
+#include <map>
 #include <optional>
 #include <span>
 
@@ -66,6 +68,12 @@ public:
     // - bounds : rectangle de rendu.
     // - rows : lignes aplaties.
     // - scroll : defilement courant.
+    // - selected_thread : session selectionnee.
+    // - selected_row : ligne selectionnee au clavier.
+    // - hovered_row : ligne actuellement survolee par le pointeur.
+    // - scrollbar_opacity : opacite courante de scrollbar.
+    // - scrollbar_width : largeur visuelle courante de scrollbar.
+    // - title_marquee_animations : progressions animees par session.
     // - palette : palette resolue.
     // ------------------------------------------------------------------------
     void Render(
@@ -73,6 +81,12 @@ public:
         const D2D1_RECT_F& bounds,
         std::span<const TreeRow> rows,
         const ScrollState& scroll,
+        const std::optional<CodexThreadId>& selected_thread,
+        std::optional<std::size_t> selected_row,
+        std::optional<std::size_t> hovered_row,
+        float scrollbar_opacity,
+        float scrollbar_width,
+        std::map<CodexThreadId, MarqueeAnimationState>& title_marquee_animations,
         const ThemePalette& palette
     );
 

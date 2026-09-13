@@ -8,6 +8,7 @@
 #pragma once
 
 #include "../graphics/CompositionHost.h"
+#include "../model/SessionCatalog.h"
 #include "../theme/ThemePalette.h"
 
 #include <windows.h>
@@ -67,8 +68,14 @@ public:
     // - hwnd : fenetre cible, utilisee pour recreer les ressources au besoin.
     // - state : textes a afficher.
     // - palette : couleurs resolues a utiliser.
+    // - catalog : snapshot courant publie par le worker de sessions.
     // ------------------------------------------------------------------------
-    void Render(HWND hwnd, const DeckVisualState& state, const ThemePalette& palette);
+    void Render(
+        HWND hwnd,
+        const DeckVisualState& state,
+        const ThemePalette& palette,
+        std::shared_ptr<const SessionCatalogSnapshot> catalog
+    );
 
     // ------------------------------------------------------------------------
     // Traite une molette verticale pour la zone Tree.
@@ -97,6 +104,11 @@ public:
     void OnPointerMove(float x, float y);
 
     // ------------------------------------------------------------------------
+    // Signale que le pointeur a quitte la fenetre.
+    // ------------------------------------------------------------------------
+    void OnPointerLeave();
+
+    // ------------------------------------------------------------------------
     // Termine un clic ou drag pointeur pour le Tree.
     //
     // Parametres :
@@ -104,6 +116,26 @@ public:
     // - y : position verticale en pixels client.
     // ------------------------------------------------------------------------
     void OnPointerUp(float x, float y);
+
+    // ------------------------------------------------------------------------
+    // Indique si un point client touche le separateur redimensionnable.
+    //
+    // Parametres :
+    // - x : position horizontale en pixels client.
+    // - y : position verticale en pixels client.
+    //
+    // Retour :
+    // - true si le pointeur est sur le separateur.
+    // ------------------------------------------------------------------------
+    bool IsPointOnSplitter(float x, float y) const;
+
+    // ------------------------------------------------------------------------
+    // Avance les animations legeres du renderer.
+    //
+    // Retour :
+    // - true si un repaint reste utile.
+    // ------------------------------------------------------------------------
+    bool AdvanceAnimations();
 
     // ------------------------------------------------------------------------
     // Traite une touche clavier de navigation Tree.

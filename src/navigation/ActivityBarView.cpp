@@ -9,6 +9,7 @@
 
 #include <wrl/client.h>
 
+#include <array>
 #include <string>
 
 using Microsoft::WRL::ComPtr;
@@ -16,26 +17,28 @@ using Microsoft::WRL::ComPtr;
 namespace {
 
 // Taille du texte de la barre d'activite.
-constexpr float kActivityBarTextSize = 12.0F;
+constexpr float kActivityBarTextSize = 13.0F;
 
 // Marge horizontale de la barre.
-constexpr float kActivityBarPaddingX = 12.0F;
+constexpr float kActivityBarPaddingX = 14.0F;
 
-// ----------------------------------------------------------------------------
-// Construit le texte compact des compteurs.
-//
-// Parametres :
-// - counts : compteurs source.
-//
-// Retour :
-// - texte affichable.
-// ----------------------------------------------------------------------------
-std::wstring ActivityText(const ActivityCounts& counts) {
-    return L"Working " + std::to_wstring(counts.working)
-        + L"   Attention " + std::to_wstring(counts.needs_attention)
-        + L"   Completed today " + std::to_wstring(counts.completed_today)
-        + L"   Ctrl+K";
-}
+// Hauteur d'un chip d'activite.
+constexpr float kChipHeight = 26.0F;
+
+// Rayon d'un chip d'activite.
+constexpr float kChipRadius = 5.0F;
+
+// Decrit un chip d'activite.
+struct ActivityChip {
+    // Filtre associe.
+    SessionFilter filter;
+
+    // Libelle affiche.
+    const wchar_t* label;
+
+    // Valeur affichee.
+    std::size_t value;
+};
 
 }  // namespace
 
@@ -54,6 +57,18 @@ struct ActivityBarResources {
 
     // Brosse de texte.
     ComPtr<ID2D1SolidColorBrush> text_brush;
+
+    // Brosse de chip.
+    ComPtr<ID2D1SolidColorBrush> chip_brush;
+
+    // Brosse d'accent.
+    ComPtr<ID2D1SolidColorBrush> accent_brush;
+
+    // Brosse de bordure.
+    ComPtr<ID2D1SolidColorBrush> border_brush;
+
+    // Brosse du texte sur accent.
+    ComPtr<ID2D1SolidColorBrush> accent_text_brush;
 };
 
 namespace {
@@ -105,23 +120,70 @@ void ActivityBarView::Render(
         );
     }
     if (!g_activity_bar_resources.background_brush) {
-        dc->CreateSolidColorBrush(palette.window_background, g_activity_bar_resources.background_brush.GetAddressOf());
-        dc->CreateSolidColorBrush(palette.text_muted, g_activity_bar_resources.text_brush.GetAddressOf());
+        dc->CreateSolidColorBrush(palette.surface, g_activity_bar_resources.background_brush.GetAddressOf());
+        dc->CreateSolidColorBrush(palette.text, g_activity_bar_resources.text_brush.GetAddressOf());
+        dc->CreateSolidColorBrush(palette.surface_hover, g_activity_bar_resources.chip_brush.GetAddressOf());
+        dc->CreateSolidColorBrush(palette.accent, g_activity_bar_resources.accent_brush.GetAddressOf());
+        dc->CreateSolidColorBrush(palette.border, g_activity_bar_resources.border_brush.GetAddressOf());
+        dc->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), g_activity_bar_resources.accent_text_brush.GetAddressOf());
     }
-    if (!g_activity_bar_resources.text_format || !g_activity_bar_resources.background_brush || !g_activity_bar_resources.text_brush) {
+    if (!g_activity_bar_resources.text_format
+        || !g_activity_bar_resources.background_brush
+        || !g_activity_bar_resources.text_brush
+        || !g_activity_bar_resources.chip_brush
+        || !g_activity_bar_resources.accent_brush
+        || !g_activity_bar_resources.border_brush
+        || !g_activity_bar_resources.accent_text_brush) {
         return;
     }
 
     g_activity_bar_resources.background_brush->SetColor(palette.window_background);
-    g_activity_bar_resources.text_brush->SetColor(palette.text_muted);
+    g_activity_bar_resources.text_brush->SetColor(palette.text);
+    g_activity_bar_resources.chip_brush->SetColor(palette.surface);
+    g_activity_bar_resources.accent_brush->SetColor(palette.accent);
+    g_activity_bar_resources.border_brush->SetColor(palette.border);
+    g_activity_bar_resources.accent_text_brush->SetColor(D2D1::ColorF(D2D1::ColorF::White));
     dc->FillRectangle(bounds, g_activity_bar_resources.background_brush.Get());
+    dc->DrawLine(
+        D2D1::Point2F(bounds.left, bounds.bottom - 0.5F),
+        D2D1::Point2F(bounds.right, bounds.bottom - 0.5F),
+        g_activity_bar_resources.border_brush.Get(),
+        1.0F
+    );
 
-    const std::wstring text = ActivityText(counts);
+    const std::array<ActivityChip, 3> chips{{
+        {SessionFilter::Working, L"Working", counts.working},
+        {SessionFilter::NeedsAttention, L"Attention", counts.needs_attention},
+        {SessionFilter::CompletedToday, L"Done today", counts.completed_today},
+    }};
+
+    float x = bounds.left + kActivityBarPaddingX;
+    const float y = bounds.top + (bounds.bottom - bounds.top - kChipHeight) * 0.5F;
+    for (const ActivityChip& chip : chips) {
+        const float width = chip.filter == SessionFilter::CompletedToday ? 118.0F : 98.0F;
+        const D2D1_RECT_F rect = D2D1::RectF(x, y, x + width, y + kChipHeight);
+        const bool active = chip.filter == active_filter;
+        dc->FillRoundedRectangle(
+            D2D1::RoundedRect(rect, kChipRadius, kChipRadius),
+            active ? g_activity_bar_resources.accent_brush.Get() : g_activity_bar_resources.chip_brush.Get()
+        );
+        const std::wstring text = std::wstring(chip.label) + L" " + std::to_wstring(chip.value);
+        dc->DrawTextW(
+            text.c_str(),
+            static_cast<UINT32>(text.size()),
+            g_activity_bar_resources.text_format.Get(),
+            D2D1::RectF(rect.left + 10.0F, rect.top + 5.0F, rect.right - 10.0F, rect.bottom),
+            active ? g_activity_bar_resources.accent_text_brush.Get() : g_activity_bar_resources.text_brush.Get()
+        );
+        x += width + 8.0F;
+    }
+
+    const std::wstring text = L"Ctrl+K";
     dc->DrawTextW(
         text.c_str(),
         static_cast<UINT32>(text.size()),
         g_activity_bar_resources.text_format.Get(),
-        D2D1::RectF(bounds.left + kActivityBarPaddingX, bounds.top + 6.0F, bounds.right - kActivityBarPaddingX, bounds.bottom),
+        D2D1::RectF(bounds.right - 72.0F, bounds.top + 12.0F, bounds.right - kActivityBarPaddingX, bounds.bottom),
         g_activity_bar_resources.text_brush.Get()
     );
 }
