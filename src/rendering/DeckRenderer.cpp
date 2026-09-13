@@ -25,14 +25,60 @@
 #include <wrl/client.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <map>
+#include <mutex>
+#include <optional>
 #include <string>
+#include <thread>
 #include <cwctype>
 
 using Microsoft::WRL::ComPtr;
 
+// Geometries mises en cache pour le cadre arrondi du Tree.
+struct RoundedTreeFrameGeometry {
+    // Masque qui retire l'ancien angle droit du fond.
+    ComPtr<ID2D1PathGeometry> corner_mask;
+
+    // Trace continu du bord superieur et du separateur.
+    ComPtr<ID2D1PathGeometry> frame;
+
+    // Rectangle utilise lors de la derniere construction.
+    D2D1_RECT_F bounds{};
+
+    // Rayon utilise lors de la derniere construction.
+    float radius = -1.0F;
+};
+
+// Requete immutable transmise au worker de recherche volumineuse.
+struct PaletteSearchRequest {
+    // Snapshot de catalogue isole du thread UI.
+    SessionCatalogSnapshot catalog;
+    // Requete texte associee.
+    std::wstring query;
+    // Mode de recherche demande.
+    CommandPaletteMode mode = CommandPaletteMode::Commands;
+    // Generation monotone permettant d'ecarter un resultat obsolete.
+    std::uint64_t generation = 0;
+};
+
+// Resultat calcule par le worker et pret a etre publie sur le thread UI.
+struct PaletteSearchResult {
+    // Entrees triees retournees par le matcher.
+    std::vector<PaletteEntry> entries;
+    // Generation de la requete source.
+    std::uint64_t generation = 0;
+};
+
 struct DeckRenderer::Impl {
+    // Cree l'etat et demarre le worker persistant de recherche.
+    Impl();
+
+    // Arrete le worker avant de liberer l'etat partage.
+    ~Impl();
+
     // Hote DirectComposition proprietaire de la surface de dessin.
     CompositionHost composition;
 
@@ -47,6 +93,9 @@ struct DeckRenderer::Impl {
 
     // Brosse du sous-titre.
     ComPtr<ID2D1SolidColorBrush> subtitle_brush;
+
+    // Geometries du cadre de navigation recalculees seulement au resize.
+    RoundedTreeFrameGeometry rounded_tree_frame;
 
     // Format du titre principal.
     ComPtr<IDWriteTextFormat> title_format;
@@ -105,6 +154,39 @@ struct DeckRenderer::Impl {
     // Entree de palette selectionnee.
     std::size_t command_palette_selection = 0;
 
+    // Position du caret dans la requete de palette.
+    std::size_t command_palette_cursor = 0;
+
+    // Mode courant distinguant recherche et commandes.
+    CommandPaletteMode command_palette_mode = CommandPaletteMode::Commands;
+
+    // Instant de redemarrage du clignotement du caret.
+    std::chrono::steady_clock::time_point command_palette_caret_epoch = std::chrono::steady_clock::now();
+
+    // Taille logique du dernier rendu utilisee par le hit testing d'overlay.
+    D2D1_SIZE_F viewport_size = D2D1::SizeF(1.0F, 1.0F);
+
+    // Fenetre a invalider lorsqu'un resultat asynchrone est disponible.
+    std::atomic<HWND> render_window = nullptr;
+
+    // Worker persistant reserve au scoring des gros catalogues.
+    std::jthread command_palette_worker;
+
+    // Protege requete et resultat echanges avec le worker.
+    std::mutex command_palette_worker_mutex;
+
+    // Reveille le worker lorsqu'une requete plus recente arrive.
+    std::condition_variable_any command_palette_worker_condition;
+
+    // Derniere requete restant a calculer.
+    std::optional<PaletteSearchRequest> pending_palette_request;
+
+    // Dernier resultat attendant sa publication UI.
+    std::optional<PaletteSearchResult> pending_palette_result;
+
+    // Generation courante de recherche.
+    std::atomic<std::uint64_t> command_palette_generation = 0;
+
     // Largeur courante du Tree.
     float tree_width = 300.0F;
 
@@ -161,12 +243,17 @@ struct DeckRenderer::Impl {
     void RebuildCommandPalette();
 
     // ------------------------------------------------------------------------
+    // Publie sur le thread UI un resultat produit par le worker.
+    // ------------------------------------------------------------------------
+    void ApplyPendingCommandPaletteResult();
+
+    // ------------------------------------------------------------------------
     // Execute une commande applicative sur l'etat synthetique local.
     //
     // Parametres :
-    // - command : type de commande a traiter.
+    // - command : commande parametree a traiter.
     // ------------------------------------------------------------------------
-    void ExecuteCommand(DeckCommandKind command);
+    void ExecuteCommand(const DeckCommand& command);
 
     // ------------------------------------------------------------------------
     // Calcule les metriques de scrollbar Tree.
@@ -213,6 +300,9 @@ constexpr float kComposerPlaceholderHeight = 120.0F;
 // Largeur de zone de hit du separateur.
 constexpr float kSplitterHitWidth = 8.0F;
 
+// Rayon du raccord entre le bord superieur du Tree et son separateur.
+constexpr float kNavigationCornerRadius = 8.0F;
+
 // Largeur fine de la scrollbar du Tree.
 constexpr float kTreeScrollbarRestWidth = 8.0F;
 
@@ -233,6 +323,9 @@ constexpr float kTitleMarqueeMaximumSpeed = 44.0F;
 
 // Duree maximale prise en compte pour eviter un saut apres un blocage UI.
 constexpr float kMaximumAnimationDeltaSeconds = 0.05F;
+
+// Volume a partir duquel le scoring quitte le thread UI.
+constexpr std::size_t kPaletteWorkerThreshold = 2000;
 
 // Pas de disparition de scrollbar par frame.
 constexpr float kScrollbarFadeStep = 0.08F;
@@ -368,6 +461,106 @@ D2D1_RECT_F ToD2DRect(const LayoutRect& rect) {
 }
 
 // ----------------------------------------------------------------------------
+// Dessine le cadre arrondi du Tree et masque son ancien angle droit.
+//
+// Parametres :
+// - dc : contexte Direct2D cible.
+// - tree_bounds : rectangle courant du Tree.
+// - corner_radius : rayon du raccord superieur droit.
+// - outside_brush : brosse du fond exterieur utilisee pour masquer le coin.
+// - border_brush : brosse du cadre et du separateur.
+// ----------------------------------------------------------------------------
+void DrawRoundedTreeFrame(
+    ID2D1DeviceContext* dc,
+    const D2D1_RECT_F& tree_bounds,
+    float corner_radius,
+    ID2D1Brush* outside_brush,
+    ID2D1Brush* border_brush,
+    RoundedTreeFrameGeometry& geometry
+) {
+    if (dc == nullptr || outside_brush == nullptr || border_brush == nullptr) {
+        return;
+    }
+    const float radius = std::clamp(
+        corner_radius,
+        0.0F,
+        std::min(tree_bounds.right - tree_bounds.left, tree_bounds.bottom - tree_bounds.top)
+    );
+    ComPtr<ID2D1Factory> factory;
+    dc->GetFactory(factory.GetAddressOf());
+    if (!factory || radius <= 0.0F) {
+        return;
+    }
+
+    const bool geometry_current = geometry.corner_mask
+        && geometry.frame
+        && geometry.bounds.left == tree_bounds.left
+        && geometry.bounds.top == tree_bounds.top
+        && geometry.bounds.right == tree_bounds.right
+        && geometry.bounds.bottom == tree_bounds.bottom
+        && geometry.radius == radius;
+    if (!geometry_current) {
+        geometry.corner_mask.Reset();
+        geometry.frame.Reset();
+
+        ComPtr<ID2D1GeometrySink> mask_sink;
+        if (FAILED(factory->CreatePathGeometry(geometry.corner_mask.GetAddressOf()))
+            || FAILED(geometry.corner_mask->Open(mask_sink.GetAddressOf()))) {
+            return;
+        }
+        mask_sink->BeginFigure(
+            D2D1::Point2F(tree_bounds.right - radius, tree_bounds.top),
+            D2D1_FIGURE_BEGIN_FILLED
+        );
+        mask_sink->AddLine(D2D1::Point2F(tree_bounds.right, tree_bounds.top));
+        mask_sink->AddLine(D2D1::Point2F(tree_bounds.right, tree_bounds.top + radius));
+        mask_sink->AddArc(D2D1::ArcSegment(
+            D2D1::Point2F(tree_bounds.right - radius, tree_bounds.top),
+            D2D1::SizeF(radius, radius),
+            0.0F,
+            D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE,
+            D2D1_ARC_SIZE_SMALL
+        ));
+        mask_sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+        if (FAILED(mask_sink->Close())) {
+            geometry.corner_mask.Reset();
+            return;
+        }
+
+        ComPtr<ID2D1GeometrySink> frame_sink;
+        if (FAILED(factory->CreatePathGeometry(geometry.frame.GetAddressOf()))
+            || FAILED(geometry.frame->Open(frame_sink.GetAddressOf()))) {
+            geometry.corner_mask.Reset();
+            return;
+        }
+        frame_sink->BeginFigure(
+            D2D1::Point2F(tree_bounds.left, tree_bounds.top),
+            D2D1_FIGURE_BEGIN_HOLLOW
+        );
+        frame_sink->AddLine(D2D1::Point2F(tree_bounds.right - radius, tree_bounds.top));
+        frame_sink->AddArc(D2D1::ArcSegment(
+            D2D1::Point2F(tree_bounds.right, tree_bounds.top + radius),
+            D2D1::SizeF(radius, radius),
+            0.0F,
+            D2D1_SWEEP_DIRECTION_CLOCKWISE,
+            D2D1_ARC_SIZE_SMALL
+        ));
+        frame_sink->AddLine(D2D1::Point2F(tree_bounds.right, tree_bounds.bottom));
+        frame_sink->EndFigure(D2D1_FIGURE_END_OPEN);
+        if (FAILED(frame_sink->Close())) {
+            geometry.corner_mask.Reset();
+            geometry.frame.Reset();
+            return;
+        }
+        geometry.bounds = tree_bounds;
+        geometry.radius = radius;
+    }
+
+    dc->FillGeometry(geometry.corner_mask.Get(), outside_brush);
+    dc->DrawGeometry(geometry.frame.Get(), border_brush, 1.0F);
+}
+
+// ----------------------------------------------------------------------------
 // Calcule si une position est sur la zone de redimensionnement.
 //
 // Parametres :
@@ -401,6 +594,45 @@ std::string NarrowAscii(std::wstring_view text) {
 
 }  // namespace
 
+// Cree l'etat et demarre le worker persistant de recherche.
+DeckRenderer::Impl::Impl() {
+    command_palette_worker = std::jthread([this](std::stop_token stop_token) {
+        std::unique_lock lock(command_palette_worker_mutex);
+        while (!stop_token.stop_requested()) {
+            command_palette_worker_condition.wait(lock, stop_token, [this] {
+                return pending_palette_request.has_value();
+            });
+            if (stop_token.stop_requested()) {
+                break;
+            }
+            PaletteSearchRequest request = std::move(*pending_palette_request);
+            pending_palette_request.reset();
+            lock.unlock();
+            std::vector<PaletteEntry> entries = BuildCommandPaletteEntries(
+                request.catalog,
+                request.query,
+                request.mode
+            );
+            lock.lock();
+            if (request.generation == command_palette_generation.load()) {
+                pending_palette_result = PaletteSearchResult{std::move(entries), request.generation};
+                if (const HWND hwnd = render_window.load()) {
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                }
+            }
+        }
+    });
+}
+
+// Arrete le worker avant de liberer l'etat partage.
+DeckRenderer::Impl::~Impl() {
+    command_palette_worker.request_stop();
+    command_palette_worker_condition.notify_all();
+    if (command_palette_worker.joinable()) {
+        command_palette_worker.join();
+    }
+}
+
 // ----------------------------------------------------------------------------
 // Reconstruit les lignes depuis l'etat courant.
 // ----------------------------------------------------------------------------
@@ -417,7 +649,31 @@ void DeckRenderer::Impl::RebuildTreeRows() {
 // Reconstruit les entrees de Command Palette depuis la requete courante.
 // ----------------------------------------------------------------------------
 void DeckRenderer::Impl::RebuildCommandPalette() {
-    command_palette_entries = BuildCommandPaletteEntries(render_catalog, command_palette_query);
+    ++command_palette_generation;
+    const std::size_t candidate_count = render_catalog.projects.size() + render_catalog.sessions.size();
+    if (candidate_count > kPaletteWorkerThreshold) {
+        {
+            std::lock_guard lock(command_palette_worker_mutex);
+            pending_palette_request = PaletteSearchRequest{
+                render_catalog,
+                command_palette_query,
+                command_palette_mode,
+                command_palette_generation.load(),
+            };
+            pending_palette_result.reset();
+        }
+        command_palette_entries.clear();
+        command_palette_selection = 0;
+        command_palette_worker_condition.notify_one();
+        return;
+    }
+
+    {
+        std::lock_guard lock(command_palette_worker_mutex);
+        pending_palette_request.reset();
+        pending_palette_result.reset();
+    }
+    command_palette_entries = BuildCommandPaletteEntries(render_catalog, command_palette_query, command_palette_mode);
     if (!command_palette_entries.empty() && command_palette_selection >= command_palette_entries.size()) {
         command_palette_selection = command_palette_entries.size() - 1;
     } else if (command_palette_entries.empty()) {
@@ -425,23 +681,97 @@ void DeckRenderer::Impl::RebuildCommandPalette() {
     }
 }
 
+// Publie sur le thread UI un resultat produit par le worker.
+void DeckRenderer::Impl::ApplyPendingCommandPaletteResult() {
+    std::optional<PaletteSearchResult> result;
+    {
+        std::lock_guard lock(command_palette_worker_mutex);
+        if (pending_palette_result && pending_palette_result->generation == command_palette_generation.load()) {
+            result = std::move(pending_palette_result);
+            pending_palette_result.reset();
+        }
+    }
+    if (!result) {
+        return;
+    }
+    command_palette_entries = std::move(result->entries);
+    command_palette_selection = command_palette_entries.empty()
+        ? 0
+        : std::min(command_palette_selection, command_palette_entries.size() - 1);
+}
+
 // ----------------------------------------------------------------------------
 // Execute une commande applicative sur l'etat courant local.
 // ----------------------------------------------------------------------------
-void DeckRenderer::Impl::ExecuteCommand(DeckCommandKind command) {
-    if (tree_rows.empty()) {
-        return;
-    }
-
-    switch (command) {
+void DeckRenderer::Impl::ExecuteCommand(const DeckCommand& command) {
+    switch (command.kind) {
     case DeckCommandKind::OpenCommandPalette:
-    case DeckCommandKind::OpenSearch:
+        command_palette_mode = CommandPaletteMode::Commands;
         command_palette_open = true;
         command_palette_query.clear();
+        command_palette_cursor = 0;
         command_palette_selection = 0;
+        command_palette_caret_epoch = std::chrono::steady_clock::now();
         RebuildCommandPalette();
         break;
+    case DeckCommandKind::OpenSearch:
+        command_palette_mode = CommandPaletteMode::Search;
+        command_palette_open = true;
+        command_palette_query.clear();
+        command_palette_cursor = 0;
+        command_palette_selection = 0;
+        command_palette_caret_epoch = std::chrono::steady_clock::now();
+        RebuildCommandPalette();
+        break;
+    case DeckCommandKind::OpenThread: {
+        if (!command.thread_id) {
+            break;
+        }
+        active_filter = SessionFilter::All;
+        tree_state.selected_thread = command.thread_id;
+        for (const SessionRecord& session : render_catalog.sessions) {
+            if (session.codex.id != *command.thread_id) {
+                continue;
+            }
+            if (session.project_id) {
+                tree_state.expanded_projects.insert(*session.project_id);
+            } else {
+                tree_state.unassigned_expanded = true;
+            }
+            break;
+        }
+        RebuildTreeRows();
+        const auto row = std::ranges::find_if(tree_rows, [&command](const TreeRow& candidate) {
+            return candidate.thread_id == command.thread_id;
+        });
+        if (row != tree_rows.end()) {
+            selected_tree_row = static_cast<std::size_t>(std::distance(tree_rows.begin(), row));
+            tree_row_focus_visible = true;
+            tree_scroll.EnsureVisible(selected_tree_row, tree_view.RowHeight());
+        }
+        break;
+    }
+    case DeckCommandKind::OpenWorkspace: {
+        if (!command.project_id) {
+            break;
+        }
+        active_filter = SessionFilter::All;
+        tree_state.expanded_projects.insert(*command.project_id);
+        RebuildTreeRows();
+        const auto row = std::ranges::find_if(tree_rows, [&command](const TreeRow& candidate) {
+            return candidate.kind == TreeRowKind::Project && candidate.project_id == command.project_id;
+        });
+        if (row != tree_rows.end()) {
+            selected_tree_row = static_cast<std::size_t>(std::distance(tree_rows.begin(), row));
+            tree_row_focus_visible = true;
+            tree_scroll.EnsureVisible(selected_tree_row, tree_view.RowHeight());
+        }
+        break;
+    }
     case DeckCommandKind::RenameThread: {
+        if (tree_rows.empty() || selected_tree_row >= tree_rows.size()) {
+            break;
+        }
         const TreeRow& row = tree_rows[selected_tree_row];
         if (row.kind != TreeRowKind::Session || !row.thread_id) {
             break;
@@ -453,6 +783,9 @@ void DeckRenderer::Impl::ExecuteCommand(DeckCommandKind command) {
         break;
     }
     case DeckCommandKind::ArchiveThread: {
+        if (tree_rows.empty() || selected_tree_row >= tree_rows.size()) {
+            break;
+        }
         const TreeRow& row = tree_rows[selected_tree_row];
         if (row.kind != TreeRowKind::Session || !row.thread_id) {
             break;
@@ -460,6 +793,23 @@ void DeckRenderer::Impl::ExecuteCommand(DeckCommandKind command) {
         for (SessionRecord& session : render_catalog.sessions) {
             if (session.codex.id == *row.thread_id) {
                 session.codex.archived = true;
+                break;
+            }
+        }
+        RebuildTreeRows();
+        break;
+    }
+    case DeckCommandKind::ToggleFavorite: {
+        if (tree_rows.empty() || selected_tree_row >= tree_rows.size()) {
+            break;
+        }
+        const TreeRow& row = tree_rows[selected_tree_row];
+        if (row.kind != TreeRowKind::Session || !row.thread_id) {
+            break;
+        }
+        for (SessionRecord& session : render_catalog.sessions) {
+            if (session.codex.id == *row.thread_id) {
+                session.favorite = !session.favorite;
                 break;
             }
         }
@@ -504,6 +854,7 @@ bool DeckRenderer::Initialize(HWND hwnd) {
     if (impl_ == nullptr) {
         impl_ = std::make_unique<Impl>();
     }
+    impl_->render_window.store(hwnd);
     if (!impl_->composition.Initialize(hwnd).has_value()) {
         return false;
     }
@@ -587,6 +938,7 @@ void DeckRenderer::Render(
         return;
     }
     ID2D1DeviceContext* context = *context_result;
+    impl_->ApplyPendingCommandPaletteResult();
     if (!impl_->background_brush) {
         context->CreateSolidColorBrush(
             palette.window_background,
@@ -603,6 +955,7 @@ void DeckRenderer::Render(
     }
 
     const D2D1_SIZE_F size = context->GetSize();
+    impl_->viewport_size = size;
     const MainLayoutRects layout = ComputeMainLayout(
         SizeF{size.width, size.height},
         impl_->tree_width,
@@ -651,11 +1004,13 @@ void DeckRenderer::Render(
     );
     const float splitter_center = (layout.splitter.left + layout.splitter.right) * 0.5F;
     impl_->subtitle_brush->SetOpacity(0.52F);
-    context->DrawLine(
-        D2D1::Point2F(splitter_center, layout.splitter.top),
-        D2D1::Point2F(splitter_center, layout.splitter.bottom),
+    DrawRoundedTreeFrame(
+        context,
+        D2D1::RectF(layout.tree.left, layout.tree.top, splitter_center, layout.tree.bottom),
+        kNavigationCornerRadius,
+        impl_->background_brush.Get(),
         impl_->subtitle_brush.Get(),
-        1.0F
+        impl_->rounded_tree_frame
     );
     const float handle_center_y = (layout.splitter.top + layout.splitter.bottom) * 0.5F;
     for (int index = -1; index <= 1; ++index) {
@@ -693,6 +1048,11 @@ void DeckRenderer::Render(
             impl_->command_palette_query,
             impl_->command_palette_entries,
             impl_->command_palette_selection,
+            impl_->command_palette_cursor,
+            impl_->command_palette_mode,
+            (std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - impl_->command_palette_caret_epoch
+            ).count() / 500) % 2 == 0,
             palette
         );
     }
@@ -708,6 +1068,20 @@ void DeckRenderer::OnMouseWheel(int delta) {
     if (impl_ == nullptr) {
         return;
     }
+    if (impl_->command_palette_open && !impl_->command_palette_entries.empty()) {
+        constexpr std::size_t kPaletteWheelStep = 3;
+        if (delta > 0) {
+            impl_->command_palette_selection = impl_->command_palette_selection > kPaletteWheelStep
+                ? impl_->command_palette_selection - kPaletteWheelStep
+                : 0;
+        } else if (delta < 0) {
+            impl_->command_palette_selection = std::min(
+                impl_->command_palette_selection + kPaletteWheelStep,
+                impl_->command_palette_entries.size() - 1
+            );
+        }
+        return;
+    }
     constexpr float kWheelLineHeight = 30.0F;
     constexpr float kWheelLinesPerNotch = 3.0F;
     impl_->tree_scrollbar_opacity = 1.0F;
@@ -719,6 +1093,32 @@ void DeckRenderer::OnMouseWheel(int delta) {
 // ----------------------------------------------------------------------------
 void DeckRenderer::OnPointerDown(float x, float y) {
     if (impl_ == nullptr) {
+        return;
+    }
+    if (impl_->command_palette_open) {
+        const D2D1_RECT_F bounds = D2D1::RectF(0.0F, 0.0F, impl_->viewport_size.width, impl_->viewport_size.height);
+        if (const auto hit = impl_->command_palette_view.HitTestEntry(
+                bounds,
+                impl_->command_palette_entries.size(),
+                impl_->command_palette_selection,
+                x,
+                y
+            )) {
+            impl_->command_palette_selection = *hit;
+            const DeckCommand command = impl_->command_palette_entries[*hit].command;
+            impl_->command_palette_open = false;
+            impl_->ExecuteCommand(command);
+        } else if (!impl_->command_palette_view.Contains(bounds, impl_->command_palette_entries.size(), x, y)) {
+            impl_->command_palette_open = false;
+        } else if (impl_->command_palette_view.IsPointOnQuery(
+                       bounds,
+                       impl_->command_palette_entries.size(),
+                       x,
+                       y
+                   )) {
+            impl_->command_palette_cursor = impl_->command_palette_query.size();
+            impl_->command_palette_caret_epoch = std::chrono::steady_clock::now();
+        }
         return;
     }
     if (y < kActivityBarHeight) {
@@ -865,6 +1265,20 @@ bool DeckRenderer::IsPointOnSplitter(float x, float y) const {
     return impl_->resizing_tree || IsSplitterHit(x, impl_->tree_width);
 }
 
+// Indique si un point touche le champ de saisie de la palette ouverte.
+bool DeckRenderer::IsPointOnTextInput(float x, float y) const {
+    if (impl_ == nullptr || !impl_->command_palette_open) {
+        return false;
+    }
+    const D2D1_RECT_F bounds = D2D1::RectF(0.0F, 0.0F, impl_->viewport_size.width, impl_->viewport_size.height);
+    return impl_->command_palette_view.IsPointOnQuery(
+        bounds,
+        impl_->command_palette_entries.size(),
+        x,
+        y
+    );
+}
+
 // ----------------------------------------------------------------------------
 // Avance les animations legeres du renderer.
 // ----------------------------------------------------------------------------
@@ -927,23 +1341,26 @@ bool DeckRenderer::AdvanceAnimations() {
     }
     if (!impl_->tree_hovered && !impl_->resizing_tree && !impl_->dragging_tree_scrollbar && impl_->tree_scrollbar_opacity > 0.0F) {
         impl_->tree_scrollbar_opacity = std::max(0.0F, impl_->tree_scrollbar_opacity - kScrollbarFadeStep);
-        return impl_->tree_scrollbar_opacity > 0.0F || previous_scrollbar_width != impl_->tree_scrollbar_width || marquee_animating;
+        return impl_->command_palette_open || impl_->tree_scrollbar_opacity > 0.0F
+            || previous_scrollbar_width != impl_->tree_scrollbar_width || marquee_animating;
     }
     return impl_->tree_hovered
         || impl_->resizing_tree
         || impl_->dragging_tree_scrollbar
         || impl_->tree_scrollbar_opacity > 0.0F
         || previous_scrollbar_width != impl_->tree_scrollbar_width
-        || marquee_animating;
+        || marquee_animating
+        || impl_->command_palette_open;
 }
 
 // ----------------------------------------------------------------------------
 // Traite une touche clavier de navigation Tree.
 // ----------------------------------------------------------------------------
 bool DeckRenderer::OnKeyDown(WPARAM virtual_key) {
-    if (impl_ == nullptr || impl_->tree_rows.empty()) {
+    if (impl_ == nullptr) {
         return false;
     }
+    impl_->ApplyPendingCommandPaletteResult();
 
     if (impl_->rename_active) {
         if (virtual_key == VK_ESCAPE) {
@@ -977,7 +1394,7 @@ bool DeckRenderer::OnKeyDown(WPARAM virtual_key) {
     }
 
     if (const auto command = TranslateShortcut(KeyChord{virtual_key, IsControlDown(), IsShiftDown()})) {
-        impl_->ExecuteCommand(*command);
+        impl_->ExecuteCommand(DeckCommand{*command, std::nullopt, std::nullopt});
         return true;
     }
 
@@ -997,17 +1414,57 @@ bool DeckRenderer::OnKeyDown(WPARAM virtual_key) {
             }
             return true;
         case VK_BACK:
-            if (!impl_->command_palette_query.empty()) {
-                impl_->command_palette_query.pop_back();
+            if (impl_->command_palette_cursor > 0) {
+                impl_->command_palette_query.erase(impl_->command_palette_cursor - 1, 1);
+                --impl_->command_palette_cursor;
                 impl_->RebuildCommandPalette();
             }
+            impl_->command_palette_caret_epoch = std::chrono::steady_clock::now();
+            return true;
+        case VK_DELETE:
+            if (impl_->command_palette_cursor < impl_->command_palette_query.size()) {
+                impl_->command_palette_query.erase(impl_->command_palette_cursor, 1);
+                impl_->RebuildCommandPalette();
+            }
+            impl_->command_palette_caret_epoch = std::chrono::steady_clock::now();
+            return true;
+        case VK_LEFT:
+            if (impl_->command_palette_cursor > 0) {
+                --impl_->command_palette_cursor;
+            }
+            impl_->command_palette_caret_epoch = std::chrono::steady_clock::now();
+            return true;
+        case VK_RIGHT:
+            if (impl_->command_palette_cursor < impl_->command_palette_query.size()) {
+                ++impl_->command_palette_cursor;
+            }
+            impl_->command_palette_caret_epoch = std::chrono::steady_clock::now();
+            return true;
+        case VK_HOME:
+            impl_->command_palette_cursor = 0;
+            impl_->command_palette_caret_epoch = std::chrono::steady_clock::now();
+            return true;
+        case VK_END:
+            impl_->command_palette_cursor = impl_->command_palette_query.size();
+            impl_->command_palette_caret_epoch = std::chrono::steady_clock::now();
             return true;
         case VK_RETURN:
+            if (!impl_->command_palette_entries.empty()
+                && impl_->command_palette_selection < impl_->command_palette_entries.size()) {
+                const DeckCommand command = impl_->command_palette_entries[impl_->command_palette_selection].command;
+                impl_->command_palette_open = false;
+                impl_->ExecuteCommand(command);
+                return true;
+            }
             impl_->command_palette_open = false;
             return true;
         default:
             return true;
         }
+    }
+
+    if (impl_->tree_rows.empty()) {
+        return false;
     }
 
     switch (virtual_key) {
@@ -1074,7 +1531,9 @@ bool DeckRenderer::OnChar(wchar_t character) {
     if (std::iswcntrl(character) != 0) {
         return true;
     }
-    impl_->command_palette_query.push_back(character);
+    impl_->command_palette_query.insert(impl_->command_palette_cursor, 1, character);
+    ++impl_->command_palette_cursor;
+    impl_->command_palette_caret_epoch = std::chrono::steady_clock::now();
     impl_->RebuildCommandPalette();
     return true;
 }

@@ -64,9 +64,6 @@ struct ActivityBarResources {
     // Brosse d'accent.
     ComPtr<ID2D1SolidColorBrush> accent_brush;
 
-    // Brosse de bordure.
-    ComPtr<ID2D1SolidColorBrush> border_brush;
-
     // Brosse du texte sur accent.
     ComPtr<ID2D1SolidColorBrush> accent_text_brush;
 };
@@ -124,7 +121,6 @@ void ActivityBarView::Render(
         dc->CreateSolidColorBrush(palette.text, g_activity_bar_resources.text_brush.GetAddressOf());
         dc->CreateSolidColorBrush(palette.surface_hover, g_activity_bar_resources.chip_brush.GetAddressOf());
         dc->CreateSolidColorBrush(palette.accent, g_activity_bar_resources.accent_brush.GetAddressOf());
-        dc->CreateSolidColorBrush(palette.border, g_activity_bar_resources.border_brush.GetAddressOf());
         dc->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), g_activity_bar_resources.accent_text_brush.GetAddressOf());
     }
     if (!g_activity_bar_resources.text_format
@@ -132,7 +128,6 @@ void ActivityBarView::Render(
         || !g_activity_bar_resources.text_brush
         || !g_activity_bar_resources.chip_brush
         || !g_activity_bar_resources.accent_brush
-        || !g_activity_bar_resources.border_brush
         || !g_activity_bar_resources.accent_text_brush) {
         return;
     }
@@ -141,15 +136,8 @@ void ActivityBarView::Render(
     g_activity_bar_resources.text_brush->SetColor(palette.text);
     g_activity_bar_resources.chip_brush->SetColor(palette.surface);
     g_activity_bar_resources.accent_brush->SetColor(palette.accent);
-    g_activity_bar_resources.border_brush->SetColor(palette.border);
     g_activity_bar_resources.accent_text_brush->SetColor(D2D1::ColorF(D2D1::ColorF::White));
     dc->FillRectangle(bounds, g_activity_bar_resources.background_brush.Get());
-    dc->DrawLine(
-        D2D1::Point2F(bounds.left, bounds.bottom - 0.5F),
-        D2D1::Point2F(bounds.right, bounds.bottom - 0.5F),
-        g_activity_bar_resources.border_brush.Get(),
-        1.0F
-    );
 
     const std::array<ActivityChip, 3> chips{{
         {SessionFilter::Working, L"Working", counts.working},

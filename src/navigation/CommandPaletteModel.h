@@ -28,6 +28,17 @@ enum class PaletteEntryKind {
 };
 
 // ----------------------------------------------------------------------------
+// Mode fonctionnel de la palette partagee.
+// ----------------------------------------------------------------------------
+enum class CommandPaletteMode {
+    // Recherche limitee aux sessions et projets.
+    Search,
+
+    // Palette globale incluant les actions applicatives.
+    Commands,
+};
+
+// ----------------------------------------------------------------------------
 // Entree scoree de palette.
 // ----------------------------------------------------------------------------
 struct PaletteEntry {
@@ -64,5 +75,6 @@ struct PaletteEntry {
 std::vector<PaletteEntry> BuildCommandPaletteEntries(
     const SessionCatalogSnapshot& snapshot,
     std::wstring_view query,
+    CommandPaletteMode mode = CommandPaletteMode::Commands,
     std::size_t max_results = 50
 );

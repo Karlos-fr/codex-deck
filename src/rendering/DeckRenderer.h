@@ -130,6 +130,11 @@ public:
     bool IsPointOnSplitter(float x, float y) const;
 
     // ------------------------------------------------------------------------
+    // Indique si un point touche le champ de saisie de la palette ouverte.
+    // ------------------------------------------------------------------------
+    bool IsPointOnTextInput(float x, float y) const;
+
+    // ------------------------------------------------------------------------
     // Avance les animations legeres du renderer.
     //
     // Retour :

@@ -144,6 +144,23 @@ void AddIfMatched(
     }
 }
 
+// ----------------------------------------------------------------------------
+// Ajoute une action sans filtrage pour l'etat initial de la palette.
+//
+// Parametres :
+// - entries : liste de sortie.
+// - action : action statique a exposer.
+// ----------------------------------------------------------------------------
+void AddAction(std::vector<PaletteEntry>& entries, const StaticAction& action) {
+    PaletteEntry entry{};
+    entry.kind = PaletteEntryKind::Action;
+    entry.id = action.id;
+    entry.title = action.title;
+    entry.subtitle = L"ACTION";
+    entry.command = DeckCommand{action.command, std::nullopt, std::nullopt};
+    entries.push_back(std::move(entry));
+}
+
 }  // namespace
 
 // ----------------------------------------------------------------------------
@@ -152,6 +169,7 @@ void AddIfMatched(
 std::vector<PaletteEntry> BuildCommandPaletteEntries(
     const SessionCatalogSnapshot& snapshot,
     std::wstring_view query,
+    CommandPaletteMode mode,
     std::size_t max_results
 ) {
     std::vector<PaletteEntry> entries;
@@ -188,14 +206,20 @@ std::vector<PaletteEntry> BuildCommandPaletteEntries(
         AddIfMatched(entries, query, std::move(entry), haystack);
     }
 
-    for (const StaticAction& action : kActions) {
-        PaletteEntry entry{};
-        entry.kind = PaletteEntryKind::Action;
-        entry.id = action.id;
-        entry.title = action.title;
-        entry.subtitle = L"ACTIONS";
-        entry.command = DeckCommand{action.command, std::nullopt, std::nullopt};
-        AddIfMatched(entries, query, std::move(entry), entry.title);
+    if (mode == CommandPaletteMode::Commands) {
+        for (const StaticAction& action : kActions) {
+            if (query.empty()) {
+                AddAction(entries, action);
+                continue;
+            }
+            PaletteEntry entry{};
+            entry.kind = PaletteEntryKind::Action;
+            entry.id = action.id;
+            entry.title = action.title;
+            entry.subtitle = L"ACTION";
+            entry.command = DeckCommand{action.command, std::nullopt, std::nullopt};
+            AddIfMatched(entries, query, std::move(entry), entry.title);
+        }
     }
 
     std::ranges::sort(entries, BetterEntry);

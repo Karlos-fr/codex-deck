@@ -174,6 +174,10 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
         POINT point{};
         GetCursorPos(&point);
         ScreenToClient(hwnd, &point);
+        if (renderer_.IsPointOnTextInput(static_cast<float>(point.x), static_cast<float>(point.y))) {
+            SetCursor(LoadCursorW(nullptr, IDC_IBEAM));
+            return TRUE;
+        }
         if (renderer_.IsPointOnSplitter(static_cast<float>(point.x), static_cast<float>(point.y))) {
             SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
             return TRUE;

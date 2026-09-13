@@ -85,5 +85,15 @@ int main() {
     if (utf8_entries.empty() || utf8_entries.front().title != L"Campagne compl\x00E8te") {
         return 6;
     }
+
+    const auto initial_commands = BuildCommandPaletteEntries(snapshot, L"", CommandPaletteMode::Commands);
+    if (initial_commands.empty() || initial_commands.front().kind != PaletteEntryKind::Action) {
+        return 7;
+    }
+
+    const auto search_entries = BuildCommandPaletteEntries(snapshot, L"new session", CommandPaletteMode::Search);
+    if (!search_entries.empty()) {
+        return 8;
+    }
     return 0;
 }

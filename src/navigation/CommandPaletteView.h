@@ -15,6 +15,7 @@
 #include <dwrite.h>
 
 #include <memory>
+#include <optional>
 #include <span>
 
 // ----------------------------------------------------------------------------
@@ -41,6 +42,9 @@ public:
     // - query : texte de recherche courant.
     // - entries : entrees scorees.
     // - selected_index : entree selectionnee.
+    // - cursor_index : position du caret dans la requete.
+    // - mode : contenu fonctionnel affiche.
+    // - caret_visible : indique si le caret doit etre dessine.
     // - palette : palette resolue.
     // ------------------------------------------------------------------------
     void Render(
@@ -49,6 +53,30 @@ public:
         std::wstring_view query,
         std::span<const PaletteEntry> entries,
         std::size_t selected_index,
+        std::size_t cursor_index,
+        CommandPaletteMode mode,
+        bool caret_visible,
         const ThemePalette& palette
     );
+
+    // ------------------------------------------------------------------------
+    // Retourne l'entree touchee dans la fenetre actuellement visible.
+    // ------------------------------------------------------------------------
+    std::optional<std::size_t> HitTestEntry(
+        const D2D1_RECT_F& bounds,
+        std::size_t entry_count,
+        std::size_t selected_index,
+        float x,
+        float y
+    ) const;
+
+    // ------------------------------------------------------------------------
+    // Indique si un point touche le champ de saisie de la palette.
+    // ------------------------------------------------------------------------
+    bool IsPointOnQuery(const D2D1_RECT_F& bounds, std::size_t entry_count, float x, float y) const;
+
+    // ------------------------------------------------------------------------
+    // Indique si un point appartient au panneau de palette.
+    // ------------------------------------------------------------------------
+    bool Contains(const D2D1_RECT_F& bounds, std::size_t entry_count, float x, float y) const;
 };
