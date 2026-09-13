@@ -7,6 +7,7 @@
 
 #include "SessionSyncService.h"
 
+#include "../projects/ProjectDiscoveryService.h"
 #include "../projects/ProjectRepository.h"
 #include "../storage/SessionMetadataRepository.h"
 
@@ -149,6 +150,10 @@ std::expected<std::shared_ptr<const SessionCatalogSnapshot>, StorageError> Sessi
     ProjectRepository project_repository(database_);
     SessionMetadataRepository metadata_repository(database_);
     auto projects = project_repository.List();
+    if (!projects) {
+        return std::unexpected(projects.error());
+    }
+    projects = DiscoverGitProjects(*codex_threads, std::move(*projects), project_repository, git_probe_);
     if (!projects) {
         return std::unexpected(projects.error());
     }

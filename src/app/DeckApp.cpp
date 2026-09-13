@@ -7,6 +7,7 @@
 
 #include "DeckApp.h"
 
+#include "../menu/DeckGlassMenu.h"
 #include "../projects/GitProjectProbe.h"
 #include "../projects/ProjectAssignmentService.h"
 #include "../projects/ProjectManagementController.h"
@@ -68,6 +69,12 @@ constexpr UINT_PTR kUiAnimationTimer = 2;
 // Identifiant du timer de probes externes.
 constexpr UINT_PTR kExternalRefreshTimer = 3;
 
+// Identifiant du timer de capture Glass hors WM_PAINT.
+constexpr UINT_PTR kGlassCaptureTimer = 4;
+
+// Identifiant du timer de persistance differee des reglages Glass.
+constexpr UINT_PTR kGlassPreferencesSaveTimer = 5;
+
 // Delai du timer de premier snapshot cache.
 constexpr UINT kCatalogWarmupTimerMs = 250;
 
@@ -76,6 +83,24 @@ constexpr UINT kUiAnimationTimerMs = 16;
 
 // Cadence d'evaluation du scheduler de probes.
 constexpr UINT kExternalRefreshTimerMs = 1000;
+
+// Cadence de capture Glass hors manipulation interactive de la fenetre.
+constexpr UINT kGlassCaptureTimerMs = 33;
+
+// Cadence demandee pendant la boucle modale de deplacement ou de taille.
+constexpr UINT kGlassInteractiveCaptureTimerMs = 1;
+
+// Delai sans changement avant l'ecriture des reglages Glass.
+constexpr UINT kGlassPreferencesSaveDelayMs = 350;
+
+// Convertit la couleur d'accent Direct2D en couleur GDI pour les menus.
+COLORREF GlassMenuAccent(const ThemePalette& palette) {
+    return RGB(
+        static_cast<BYTE>(std::clamp(palette.accent.r, 0.0F, 1.0F) * 255.0F),
+        static_cast<BYTE>(std::clamp(palette.accent.g, 0.0F, 1.0F) * 255.0F),
+        static_cast<BYTE>(std::clamp(palette.accent.b, 0.0F, 1.0F) * 255.0F)
+    );
+}
 
 // Contexte garde vivant jusqu'a la completion d'une creation Codex.
 struct SessionCreationWork {
@@ -257,18 +282,22 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
     case WM_CODEX_DECK_PREFERENCES_LOADED: {
         std::unique_ptr<DeckPreferences> preferences(reinterpret_cast<DeckPreferences*>(lparam));
         preferences_ = std::move(*preferences);
+        glass_settings_ = preferences_.glass;
         settings_.theme_mode = preferences_.theme_mode;
         RefreshTheme(hwnd);
         renderer_.DiscardDeviceResources();
+        renderer_.SetGlassSettings(glass_settings_);
         InvalidateRect(hwnd, nullptr, FALSE);
         return 0;
     }
     case WM_CREATE:
         RefreshTheme(hwnd);
         renderer_.Initialize(hwnd);
+        renderer_.SetGlassSettings(glass_settings_);
         SetTimer(hwnd, kCatalogWarmupTimer, kCatalogWarmupTimerMs, nullptr);
         SetTimer(hwnd, kUiAnimationTimer, kUiAnimationTimerMs, nullptr);
         SetTimer(hwnd, kExternalRefreshTimer, kExternalRefreshTimerMs, nullptr);
+        SetTimer(hwnd, kGlassCaptureTimer, kGlassCaptureTimerMs, nullptr);
         return 0;
     case WM_TIMER:
         if (wparam == kCatalogWarmupTimer && session_catalog_.Current()) {
@@ -282,15 +311,45 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
             }
             return 0;
         }
+        if (wparam == kGlassCaptureTimer) {
+            RefreshGlassFrame(hwnd);
+            return 0;
+        }
+        if (wparam == kGlassPreferencesSaveTimer) {
+            KillTimer(hwnd, kGlassPreferencesSaveTimer);
+            const DeckPreferences saved = preferences_;
+            SubmitStorageTask([saved](SqliteDatabase& database) {
+                DeckPreferencesService service(database);
+                [[maybe_unused]] const auto persisted = service.Save(saved);
+            });
+            return 0;
+        }
         if (wparam == kExternalRefreshTimer
             && external_refresh_scheduler_.TryBeginProbe(std::chrono::steady_clock::now())) {
             RequestExternalSessionProbe(hwnd);
             return 0;
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
+    case WM_ENTERSIZEMOVE:
+        interactive_size_move_ = true;
+        RefreshGlassFrame(hwnd);
+        SetTimer(hwnd, kGlassCaptureTimer, kGlassInteractiveCaptureTimerMs, nullptr);
+        return 0;
+    case WM_MOVE:
+        if (interactive_size_move_) {
+            RefreshGlassFrame(hwnd);
+        }
+        return 0;
+    case WM_EXITSIZEMOVE:
+        interactive_size_move_ = false;
+        RefreshGlassFrame(hwnd);
+        SetTimer(hwnd, kGlassCaptureTimer, kGlassCaptureTimerMs, nullptr);
+        InvalidateRect(hwnd, nullptr, FALSE);
+        return 0;
     case WM_SIZE:
         if (wparam != SIZE_MINIMIZED) {
             renderer_.Resize(hwnd);
+            RefreshGlassFrame(hwnd);
             InvalidateRect(hwnd, nullptr, FALSE);
         }
         return 0;
@@ -345,6 +404,42 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
         ReleaseCapture();
         InvalidateRect(hwnd, nullptr, FALSE);
         return 0;
+    case WM_CONTEXTMENU: {
+        POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+        if (point.x == -1 && point.y == -1) {
+            GetCursorPos(&point);
+        }
+        ShowDeckGlassMenu(hwnd, point, glass_settings_, GlassMenuAccent(PaletteForTheme(resolved_theme_)));
+        return 0;
+    }
+    case WM_COMMAND:
+        if (HandleDeckGlassMenuCommand(LOWORD(wparam), glass_settings_)) {
+            renderer_.SetGlassSettings(glass_settings_);
+            preferences_.glass = glass_settings_;
+            SetTimer(hwnd, kGlassPreferencesSaveTimer, kGlassPreferencesSaveDelayMs, nullptr);
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
+    case kDeckGlassSliderChangedMessage:
+        if (HandleDeckGlassSlider(static_cast<UINT>(lparam), static_cast<int>(wparam), glass_settings_)) {
+            renderer_.SetGlassSettings(glass_settings_);
+            preferences_.glass = glass_settings_;
+            SetTimer(hwnd, kGlassPreferencesSaveTimer, kGlassPreferencesSaveDelayMs, nullptr);
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        }
+        return 0;
+    case WM_MEASUREITEM:
+        if (MeasureDeckGlassMenuItem(reinterpret_cast<MEASUREITEMSTRUCT*>(lparam))) {
+            return TRUE;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
+    case WM_DRAWITEM:
+        if (DrawDeckGlassMenuItem(reinterpret_cast<DRAWITEMSTRUCT*>(lparam))) {
+            return TRUE;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_SETCURSOR: {
         POINT point{};
         GetCursorPos(&point);
@@ -418,14 +513,29 @@ LRESULT DeckApp::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPA
         KillTimer(hwnd, kCatalogWarmupTimer);
         KillTimer(hwnd, kUiAnimationTimer);
         KillTimer(hwnd, kExternalRefreshTimer);
+        KillTimer(hwnd, kGlassCaptureTimer);
+        KillTimer(hwnd, kGlassPreferencesSaveTimer);
         codex_supervisor_.Stop();
         StopStorageWorker();
+        renderer_.ShutdownGlass();
         renderer_.DiscardDeviceResources();
         PostQuitMessage(0);
         return 0;
     default:
         return DefWindowProcW(hwnd, message, wparam, lparam);
     }
+}
+
+// ----------------------------------------------------------------------------
+// Capture une frame Glass et programme son affichage si elle est nouvelle.
+// ----------------------------------------------------------------------------
+bool DeckApp::RefreshGlassFrame(HWND hwnd) {
+    if (!renderer_.TickGlassCapture(hwnd)) {
+        return false;
+    }
+
+    InvalidateRect(hwnd, nullptr, FALSE);
+    return true;
 }
 
 // ----------------------------------------------------------------------------
@@ -538,7 +648,8 @@ void DeckApp::HandleDeckCommand(HWND hwnd, DeckCommand command) {
 
     SubmitStorageTask([this, hwnd, command = std::move(command)](SqliteDatabase& database) mutable {
         ProjectRepository repository(database);
-        ProjectManagementController controller(repository);
+        GitProjectProbe git_probe;
+        ProjectManagementController controller(repository, &git_probe);
         std::expected<void, StorageError> result{};
         std::optional<ProjectId> created_id;
         if (command.kind == DeckCommandKind::NewProject && command.cwd && command.display_name) {
@@ -576,6 +687,7 @@ void DeckApp::HandleDeckCommand(HWND hwnd, DeckCommand command) {
 // Lance une creation de session sur le worker Codex.
 void DeckApp::SubmitSessionCreation(HWND hwnd, DeckCommand command) {
     codex_supervisor_.Submit([this, hwnd, command = std::move(command)](CodexClient& client) mutable {
+        const bool requires_automatic_assignment = !command.project_id.has_value();
         auto database_path = CodexDeckDatabasePath();
         if (!database_path) {
             PostMessageW(hwnd, WM_CODEX_DECK_SESSION_CREATE_FAILED, 0,
@@ -597,7 +709,7 @@ void DeckApp::SubmitSessionCreation(HWND hwnd, DeckCommand command) {
 
         auto work = std::make_shared<SessionCreationWork>(std::move(*database), client, session_catalog_);
         CreateSessionRequest request{command.project_id, *command.cwd, command.model, command.initial_prompt};
-        work->controller.CreateSession(std::move(request), [this, hwnd, work](
+        work->controller.CreateSession(std::move(request), [this, hwnd, work, &client, requires_automatic_assignment](
             std::expected<CreatedSession, SessionCreationError> result
         ) mutable {
             if (!result) {
@@ -610,6 +722,9 @@ void DeckApp::SubmitSessionCreation(HWND hwnd, DeckCommand command) {
                 PostMessageW(hwnd, WM_CODEX_DECK_SESSION_CREATE_FAILED, 0,
                     reinterpret_cast<LPARAM>(new std::wstring(std::move(message))));
                 return;
+            }
+            if (requires_automatic_assignment) {
+                RefreshSessionsFromCodex(client, hwnd);
             }
             PostMessageW(hwnd, WM_CODEX_DECK_SESSION_CREATED, 0,
                 reinterpret_cast<LPARAM>(new CodexThreadId(result->thread.id)));

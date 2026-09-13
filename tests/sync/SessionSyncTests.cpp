@@ -75,6 +75,21 @@ public:
     }
 };
 
+// ----------------------------------------------------------------------------
+// Probe Git qui ramene plusieurs cwd vers un meme depot.
+// ----------------------------------------------------------------------------
+class RepositoryGitProbe final : public IGitProjectProbe {
+public:
+    // Retourne une identite commune pour tous les cwd du test.
+    std::expected<std::optional<GitProjectIdentity>, ProjectDetectionError> Inspect(const std::filesystem::path& cwd) override {
+        (void)cwd;
+        return std::optional<GitProjectIdentity>{GitProjectIdentity{
+            L"D:\\VibeCoding\\codex-deck",
+            "https://example.test/codex-deck.git",
+        }};
+    }
+};
+
 }  // namespace
 
 // ----------------------------------------------------------------------------
@@ -172,6 +187,44 @@ int TestRefreshFromCodex() {
         }
     }
     return saw_a && saw_b && saw_c ? 0 : 12;
+}
+
+// ----------------------------------------------------------------------------
+// Verifie la decouverte initiale et l'association d'un depot Git inconnu.
+//
+// Retour :
+// - zero si un seul projet est cree et recoit toutes ses sessions.
+// ----------------------------------------------------------------------------
+int TestRefreshDiscoversGitProjects() {
+    auto database = CreateTestDatabase(L"-discovery");
+    RepositoryGitProbe probe;
+    SessionCatalog catalog;
+    SessionSyncService service(database, catalog, probe, [&](ThreadListOptions) {
+        return std::expected<std::vector<CodexThreadSummary>, CodexError>{std::vector<CodexThreadSummary>{
+            Thread("thr_root", "Root", L"D:\\VibeCoding\\codex-deck", 20),
+            Thread("thr_child", "Child", L"D:\\VibeCoding\\codex-deck\\src", 10),
+        }};
+    });
+
+    auto snapshot = service.RefreshFromCodex();
+    if (!snapshot || !*snapshot || (*snapshot)->projects.size() != 1 || (*snapshot)->sessions.size() != 2) {
+        return 24;
+    }
+    const Project& project = (*snapshot)->projects.front();
+    if (project.name != "codex-deck"
+        || project.roots != std::vector<std::filesystem::path>{L"D:\\VibeCoding\\codex-deck"}
+        || project.git_remote != "https://example.test/codex-deck.git") {
+        return 25;
+    }
+    for (const SessionRecord& session : (*snapshot)->sessions) {
+        if (session.project_id != project.id || session.assignment_source != AssignmentSource::Automatic) {
+            return 26;
+        }
+    }
+
+    ProjectRepository repository(database);
+    const auto persisted = repository.List();
+    return persisted && persisted->size() == 1 ? 0 : 27;
 }
 
 // ----------------------------------------------------------------------------
@@ -287,6 +340,9 @@ int main() {
         return result;
     }
     if (const int result = TestRefreshFromCodex(); result != 0) {
+        return result;
+    }
+    if (const int result = TestRefreshDiscoversGitProjects(); result != 0) {
         return result;
     }
     if (const int result = TestRefreshRequestsAreCoalesced(); result != 0) {

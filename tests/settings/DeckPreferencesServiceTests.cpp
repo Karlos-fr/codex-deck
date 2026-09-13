@@ -32,12 +32,17 @@ int main() {
     changed.theme_mode = ThemeMode::Dark;
     changed.notify_errors = false;
     changed.reduced_motion_override = true;
+    changed.glass.opacity_percent = 61;
+    changed.glass.effect.liquid.enabled = true;
+    changed.glass.effect.rain.density_percent = 177;
     if (!service.Save(changed)) {
         return 3;
     }
     const auto loaded = service.Load();
     if (!loaded || loaded->theme_mode != ThemeMode::Dark || loaded->notify_errors
-        || !loaded->notify_completions || !loaded->reduced_motion_override) {
+        || !loaded->notify_completions || !loaded->reduced_motion_override
+        || loaded->glass.opacity_percent != 61 || !loaded->glass.effect.liquid.enabled
+        || loaded->glass.effect.rain.density_percent != 177) {
         return 4;
     }
     return 0;

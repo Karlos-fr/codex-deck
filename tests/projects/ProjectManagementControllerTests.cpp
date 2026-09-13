@@ -11,6 +11,17 @@
 
 #include <windows.h>
 
+// Probe Git deterministe simulant un depot connu.
+class ProjectControllerGitProbe final : public IGitProjectProbe {
+public:
+    // Retourne une identite Git avec remote sans lancer de processus.
+    std::expected<std::optional<GitProjectIdentity>, ProjectDetectionError> Inspect(
+        const std::filesystem::path& cwd
+    ) override {
+        return std::optional<GitProjectIdentity>{GitProjectIdentity{cwd, "https://example.test/spotifyamp.git"}};
+    }
+};
+
 // Execute le cycle de vie local complet d'un projet logique.
 int main() {
     wchar_t temp[MAX_PATH]{};
@@ -28,9 +39,11 @@ int main() {
         return 2;
     }
     ProjectRepository repository(*database);
-    ProjectManagementController controller(repository);
+    ProjectControllerGitProbe git_probe;
+    ProjectManagementController controller(repository, &git_probe);
     auto project = controller.CreateProject("SpotifyAmp", L"D:\\VibeCoding\\spotifyamp");
-    if (!project || project->roots.size() != 1) {
+    if (!project || project->roots.size() != 1
+        || project->git_remote != "https://example.test/spotifyamp.git") {
         return 3;
     }
     if (!controller.RenameProject(project->id, "SpotifyAmp Native")) {

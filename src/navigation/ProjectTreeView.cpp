@@ -463,6 +463,7 @@ void ProjectTreeView::Render(
     std::optional<std::size_t> hovered_row,
     float scrollbar_opacity,
     float scrollbar_width,
+    float indent_guide_opacity,
     std::map<CodexThreadId, MarqueeAnimationState>& title_marquee_animations,
     const ThemePalette& palette
 ) {
@@ -478,6 +479,38 @@ void ProjectTreeView::Render(
     impl_->scrollbar_brush->SetColor(palette.text_muted);
     dc->FillRectangle(bounds, impl_->surface_brush.Get());
     dc->PushAxisAlignedClip(bounds, D2D1_ANTIALIAS_MODE_ALIASED);
+
+    if (indent_guide_opacity > 0.01F) {
+        const float guide_x = bounds.left + kTreePaddingX + 5.0F;
+        impl_->border_brush->SetOpacity(std::clamp(indent_guide_opacity, 0.0F, 1.0F) * 0.72F);
+        for (std::size_t parent = 0; parent < rows.size(); ++parent) {
+            const TreeRow& row = rows[parent];
+            if ((row.kind != TreeRowKind::Project && row.kind != TreeRowKind::UnassignedHeader) || !row.expanded) {
+                continue;
+            }
+            std::size_t end = parent + 1;
+            while (end < rows.size()
+                && rows[end].kind != TreeRowKind::Project
+                && rows[end].kind != TreeRowKind::UnassignedHeader) {
+                ++end;
+            }
+            if (end == parent + 1) {
+                continue;
+            }
+            const float top = bounds.top + static_cast<float>(parent + 1) * kTreeRowHeight - scroll.offset;
+            const float bottom = bounds.top + static_cast<float>(end) * kTreeRowHeight - scroll.offset;
+            if (bottom > bounds.top && top < bounds.bottom) {
+                dc->DrawLine(
+                    D2D1::Point2F(guide_x, std::max(bounds.top, top)),
+                    D2D1::Point2F(guide_x, std::min(bounds.bottom, bottom)),
+                    impl_->border_brush.Get(),
+                    0.5F
+                );
+            }
+            parent = end - 1;
+        }
+        impl_->border_brush->SetOpacity(1.0F);
+    }
 
     const VisibleRange range = ComputeVisibleRange(rows.size(), kTreeRowHeight, scroll.offset, bounds.bottom - bounds.top, 2);
     for (std::size_t index = range.first; index < range.last; ++index) {

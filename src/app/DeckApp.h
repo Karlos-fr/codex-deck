@@ -8,6 +8,7 @@
 #pragma once
 
 #include "../codex/CodexSupervisor.h"
+#include "../glass/DeckGlassSettings.h"
 #include "../model/SessionCatalog.h"
 #include "../rendering/DeckRenderer.h"
 #include "../settings/DeckSettings.h"
@@ -66,6 +67,17 @@ private:
     void RefreshTheme(HWND hwnd);
 
     // ------------------------------------------------------------------------
+    // Capture une frame Glass et programme son affichage si elle est nouvelle.
+    //
+    // Parametres :
+    // - hwnd : fenetre principale dont le Workbench doit etre rafraichi.
+    //
+    // Retour :
+    // - true lorsqu'une nouvelle capture a ete publiee.
+    // ------------------------------------------------------------------------
+    bool RefreshGlassFrame(HWND hwnd);
+
+    // ------------------------------------------------------------------------
     // Demarre le worker de stockage cache-first.
     // ------------------------------------------------------------------------
     void StartStorageWorker();
@@ -118,6 +130,9 @@ private:
     // Preferences persistantes completes.
     DeckPreferences preferences_{};
 
+    // Reglages Glass appliques au Workbench et exposes au menu contextuel.
+    DeckGlassSettings glass_settings_{};
+
     // Theme concret actuellement applique.
     ResolvedTheme resolved_theme_ = ResolvedTheme::Light;
 
@@ -144,4 +159,7 @@ private:
 
     // Dernier fingerprint recent observe.
     std::optional<std::uint64_t> external_session_fingerprint_;
+
+    // Indique que Windows execute la boucle modale de deplacement ou de taille.
+    bool interactive_size_move_ = false;
 };

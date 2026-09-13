@@ -7,6 +7,9 @@
 
 #include "DeckRenderer.h"
 
+#include "WidgetGlassElementLenses.h"
+#include "WidgetRenderGlassEffect.h"
+#include "../glass/WidgetGlassEffect.h"
 #include "../input/KeyboardShortcuts.h"
 #include "../navigation/ActivityBarModel.h"
 #include "../navigation/ActivityBarView.h"
@@ -85,6 +88,15 @@ struct DeckRenderer::Impl {
 
     // Hote DirectComposition proprietaire de la surface de dessin.
     CompositionHost composition;
+
+    // Runtime de capture du bureau utilise par le Workbench Glass.
+    WidgetGlassEffect glass_effect;
+
+    // Cache de composition Direct2D/GPU du fond Glass.
+    WidgetRenderGlassEffectCache glass_cache;
+
+    // Reglages visuels et animes courants du Workbench Glass.
+    DeckGlassSettings glass_settings{};
 
     // Factory DirectWrite utilisee pour les formats de texte.
     ComPtr<IDWriteFactory> dwrite_factory;
@@ -227,6 +239,9 @@ struct DeckRenderer::Impl {
     // Opacite courante de la scrollbar Tree.
     float tree_scrollbar_opacity = 0.0F;
 
+    // Opacite animee des guides reliant categories et sessions.
+    float tree_indent_guide_opacity = 0.0F;
+
     // Largeur visuelle courante de la scrollbar Tree.
     float tree_scrollbar_width = 8.0F;
 
@@ -354,6 +369,9 @@ constexpr std::size_t kPaletteWorkerThreshold = 2000;
 
 // Pas de disparition de scrollbar par frame.
 constexpr float kScrollbarFadeStep = 0.08F;
+
+// Pas de fondu des guides de filiation par frame.
+constexpr float kIndentGuideFadeStep = 0.075F;
 
 // DPI Win32 standard utilise en repli.
 constexpr float kDefaultDpi = 96.0F;
@@ -1254,6 +1272,35 @@ void DeckRenderer::Render(
     impl_->subtitle_brush->SetColor(palette.text_muted);
     context->Clear(palette.window_background);
     context->FillRectangle(D2D1::RectF(0.0F, 0.0F, size.width, size.height), impl_->background_brush.Get());
+    if (impl_->glass_settings.enabled) {
+        if (const WidgetGlassEffectFrame* frame = impl_->glass_effect.LatestFrame()) {
+            GlassEffectRenderProfile profile = GlassEffectProfileForAppearance(impl_->glass_settings.effect.appearance);
+            profile = ApplyUserOpacityToGlassEffectProfile(
+                profile,
+                static_cast<double>(impl_->glass_settings.opacity_percent) / 100.0
+            );
+            profile = ApplyAnimationsToGlassEffectProfile(profile, impl_->glass_settings.effect);
+            std::vector<WidgetGlassEffectLens> lenses;
+            if (impl_->glass_settings.effect.appearance.element_glass_enabled) {
+                AppendWidgetGlassElementLens(lenses, ToD2DRect(layout.workbench), profile, kNavigationCornerRadius);
+            }
+            const WidgetGlassEffectAnimationSettings animation = GlassEffectAnimationSettingsForSettings(
+                impl_->glass_settings.effect,
+                GlassEffectAnimationTimeSeconds()
+            );
+            impl_->glass_cache.DrawBackground(
+                context,
+                impl_->background_brush.Get(),
+                *frame,
+                ToD2DRect(layout.workbench),
+                size,
+                palette,
+                lenses,
+                profile,
+                animation
+            );
+        }
+    }
     impl_->tree_scroll.viewport_extent = std::max(0.0F, layout.tree.bottom - layout.tree.top);
     impl_->tree_scroll.content_extent = static_cast<float>(impl_->tree_rows.size()) * impl_->tree_view.RowHeight();
     impl_->tree_scroll.Clamp();
@@ -1276,6 +1323,7 @@ void DeckRenderer::Render(
         impl_->hovered_tree_row,
         impl_->tree_scrollbar_opacity,
         impl_->tree_scrollbar_width,
+        impl_->tree_indent_guide_opacity,
         impl_->title_marquee_animations,
         palette
     );
@@ -1352,6 +1400,32 @@ void DeckRenderer::Render(
     if (!impl_->composition.EndDraw().has_value()) {
         DiscardDeviceResources();
     }
+}
+
+// Remplace les reglages Glass appliques au Workbench.
+void DeckRenderer::SetGlassSettings(const DeckGlassSettings& settings) {
+    if (impl_ == nullptr) {
+        impl_ = std::make_unique<Impl>();
+    }
+    impl_->glass_settings = settings;
+    impl_->glass_cache.Discard();
+}
+
+// Capture une nouvelle image du bureau hors du chemin de peinture.
+bool DeckRenderer::TickGlassCapture(HWND hwnd) {
+    if (impl_ == nullptr || !impl_->glass_settings.enabled) {
+        return false;
+    }
+    return impl_->glass_effect.EnsureInitialized(hwnd) && impl_->glass_effect.TickCapture();
+}
+
+// Libere le runtime et les caches Glass.
+void DeckRenderer::ShutdownGlass() {
+    if (impl_ == nullptr) {
+        return;
+    }
+    impl_->glass_cache.Discard();
+    impl_->glass_effect.Shutdown();
 }
 
 // ----------------------------------------------------------------------------
@@ -1703,6 +1777,12 @@ bool DeckRenderer::AdvanceAnimations() {
         target_scrollbar_width,
         kScrollbarWidthStep
     );
+    const float previous_indent_guide_opacity = impl_->tree_indent_guide_opacity;
+    impl_->tree_indent_guide_opacity = ApproachVisualValue(
+        impl_->tree_indent_guide_opacity,
+        impl_->tree_hovered ? 1.0F : 0.0F,
+        kIndentGuideFadeStep
+    );
     std::optional<CodexThreadId> hovered_thread;
     if (impl_->hovered_tree_row && *impl_->hovered_tree_row < impl_->tree_rows.size()) {
         hovered_thread = impl_->tree_rows[*impl_->hovered_tree_row].thread_id;
@@ -1742,14 +1822,19 @@ bool DeckRenderer::AdvanceAnimations() {
     }
     if (!impl_->tree_hovered && !impl_->resizing_tree && !impl_->dragging_tree_scrollbar && impl_->tree_scrollbar_opacity > 0.0F) {
         impl_->tree_scrollbar_opacity = std::max(0.0F, impl_->tree_scrollbar_opacity - kScrollbarFadeStep);
-        return impl_->command_palette_open || impl_->tree_scrollbar_opacity > 0.0F
-            || previous_scrollbar_width != impl_->tree_scrollbar_width || marquee_animating;
+        return HasActiveGlassEffectAnimation(impl_->glass_settings.effect)
+            || impl_->command_palette_open || impl_->tree_scrollbar_opacity > 0.0F
+            || previous_scrollbar_width != impl_->tree_scrollbar_width
+            || previous_indent_guide_opacity != impl_->tree_indent_guide_opacity
+            || marquee_animating;
     }
-    return impl_->tree_hovered
+    return HasActiveGlassEffectAnimation(impl_->glass_settings.effect)
+        || impl_->tree_hovered
         || impl_->resizing_tree
         || impl_->dragging_tree_scrollbar
         || impl_->tree_scrollbar_opacity > 0.0F
         || previous_scrollbar_width != impl_->tree_scrollbar_width
+        || previous_indent_guide_opacity != impl_->tree_indent_guide_opacity
         || marquee_animating
         || impl_->command_palette_open;
 }
@@ -2091,4 +2176,5 @@ void DeckRenderer::DiscardDeviceResources() {
     impl_->subtitle_brush.Reset();
     impl_->title_brush.Reset();
     impl_->background_brush.Reset();
+    impl_->glass_cache.Discard();
 }

@@ -8,6 +8,7 @@
 #pragma once
 
 #include "../theme/Theme.h"
+#include "../glass/DeckGlassSettings.h"
 
 // Preferences globales de Codex Deck.
 struct DeckPreferences {
@@ -21,4 +22,6 @@ struct DeckPreferences {
     bool notify_completions = true;
     // Force la reduction des mouvements.
     bool reduced_motion_override = false;
+    // Reglages Glass persistants du Workbench.
+    DeckGlassSettings glass{};
 };

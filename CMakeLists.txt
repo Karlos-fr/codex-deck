@@ -117,8 +117,20 @@ add_executable(CodexDeck WIN32
     src/codex/CodexSupervisor.cpp
     src/codex/JsonRpcTransport.cpp
     src/graphics/CompositionHost.cpp
+    src/glass/WidgetGlassEffect.cpp
+    src/glass/WidgetGlassEffectCapture.cpp
+    src/glass/WidgetGlassEffectDistortion.cpp
+    src/glass/WidgetGlassEffectGpuProcessor.cpp
+    src/glass/WidgetGlassEffectRenderer.cpp
+    src/glass/WidgetGlassSettings.cpp
     src/input/KeyboardShortcuts.cpp
     src/main.cpp
+    src/menu/DeckGlassMenu.cpp
+    src/menu/WidgetMenuCheckbox.cpp
+    src/menu/WidgetMenuOwnerDraw.cpp
+    src/menu/WidgetMenuRadio.cpp
+    src/menu/WidgetMenuSlider.cpp
+    src/menu/WidgetMenuToggleSubmenu.cpp
     src/model/ActivityOrdering.cpp
     src/model/SessionCatalog.cpp
     src/navigation/ActivityBarModel.cpp
@@ -134,11 +146,14 @@ add_executable(CodexDeck WIN32
     src/projects/GitProjectProbe.cpp
     src/projects/PathNormalization.cpp
     src/projects/ProjectDetector.cpp
+    src/projects/ProjectDiscoveryService.cpp
     src/projects/ProjectEditorView.cpp
     src/projects/ProjectManagementController.cpp
     src/projects/ProjectAssignmentService.cpp
     src/projects/ProjectRepository.cpp
     src/rendering/DeckRenderer.cpp
+    src/rendering/WidgetGlassElementLenses.cpp
+    src/rendering/WidgetRenderGlassEffect.cpp
     src/resources/CodexDeck.rc
     src/storage/AppDataPaths.cpp
     src/storage/SchemaMigrator.cpp
@@ -188,6 +203,7 @@ target_compile_definitions(CodexDeck PRIVATE
 target_link_libraries(CodexDeck PRIVATE
     d2d1
     d3d11
+    d3dcompiler
     dxgi
     dcomp
     dwrite
@@ -225,6 +241,7 @@ endif()
 if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/settings/DeckPreferencesServiceTests.cpp")
     add_executable(DeckPreferencesServiceTests
         tests/settings/DeckPreferencesServiceTests.cpp
+        src/glass/WidgetGlassSettings.cpp
         src/settings/DeckPreferencesService.cpp
         src/storage/SchemaMigrator.cpp
         src/storage/SqliteDatabase.cpp
@@ -710,6 +727,7 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/sync/SessionSyncT
         src/projects/GitProjectProbe.cpp
         src/projects/PathNormalization.cpp
         src/projects/ProjectDetector.cpp
+        src/projects/ProjectDiscoveryService.cpp
         src/projects/ProjectRepository.cpp
         src/storage/SchemaMigrator.cpp
         src/storage/SessionMetadataRepository.cpp

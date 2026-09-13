@@ -17,8 +17,8 @@ StorageError ValidationError(const char* message) {
 }  // namespace
 
 // Cree un controller sur un repository non possede.
-ProjectManagementController::ProjectManagementController(ProjectRepository& repository)
-    : repository_(repository) {
+ProjectManagementController::ProjectManagementController(ProjectRepository& repository, IGitProjectProbe* git_probe)
+    : repository_(repository), git_probe_(git_probe) {
 }
 
 // Cree un projet et sa racine principale de facon atomique logique.
@@ -41,6 +41,16 @@ std::expected<Project, StorageError> ProjectManagementController::CreateProject(
         return std::unexpected(added.error());
     }
     project->roots.push_back(root);
+    if (git_probe_ != nullptr) {
+        const auto identity = git_probe_->Inspect(root);
+        if (identity && *identity && (*identity)->origin_remote) {
+            if (auto stored = repository_.SetGitRemote(project->id, *(*identity)->origin_remote); !stored) {
+                [[maybe_unused]] const auto rollback = repository_.Delete(project->id);
+                return std::unexpected(stored.error());
+            }
+            project->git_remote = (*identity)->origin_remote;
+        }
+    }
     return project;
 }
 

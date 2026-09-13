@@ -73,6 +73,7 @@ public:
     // - hovered_row : ligne actuellement survolee par le pointeur.
     // - scrollbar_opacity : opacite courante de scrollbar.
     // - scrollbar_width : largeur visuelle courante de scrollbar.
+    // - indent_guide_opacity : opacite animee des guides de filiation.
     // - title_marquee_animations : progressions animees par session.
     // - palette : palette resolue.
     // ------------------------------------------------------------------------
@@ -86,6 +87,7 @@ public:
         std::optional<std::size_t> hovered_row,
         float scrollbar_opacity,
         float scrollbar_width,
+        float indent_guide_opacity,
         std::map<CodexThreadId, MarqueeAnimationState>& title_marquee_animations,
         const ThemePalette& palette
     );

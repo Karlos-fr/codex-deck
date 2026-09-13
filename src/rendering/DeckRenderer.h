@@ -9,6 +9,7 @@
 
 #include "../graphics/CompositionHost.h"
 #include "../app/DeckCommand.h"
+#include "../glass/DeckGlassSettings.h"
 #include "../model/SessionCatalog.h"
 #include "../theme/ThemePalette.h"
 
@@ -111,6 +112,15 @@ public:
         const ThemePalette& palette,
         std::shared_ptr<const SessionCatalogSnapshot> catalog
     );
+
+    // Remplace les reglages Glass appliques au Workbench.
+    void SetGlassSettings(const DeckGlassSettings& settings);
+
+    // Capture une nouvelle image du bureau hors du chemin de peinture.
+    bool TickGlassCapture(HWND hwnd);
+
+    // Libere le runtime et les caches Glass.
+    void ShutdownGlass();
 
     // ------------------------------------------------------------------------
     // Traite une molette verticale pour la zone Tree.

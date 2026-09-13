@@ -10,12 +10,76 @@
 #include <nlohmann/json.hpp>
 #include <sqlite3.h>
 
+#include <algorithm>
+
 namespace {
 
 // Cle stable du document de preferences.
 constexpr char kPreferencesKey[] = "preferences";
 // Version courante du document JSON.
-constexpr int kPreferencesVersion = 1;
+constexpr int kPreferencesVersion = 2;
+
+// Serialise les reglages Glass dans le document de preferences.
+nlohmann::json GlassJson(const DeckGlassSettings& deck) {
+    const GlassEffectSettings& glass = deck.effect;
+    return {
+        {"enabled", deck.enabled}, {"opacity", deck.opacity_percent},
+        {"appearance", {{"diffusion", glass.appearance.diffusion_percent}, {"tint", glass.appearance.tint_percent},
+            {"grain", glass.appearance.grain_percent}, {"edgeRefraction", glass.appearance.edge_refraction_percent},
+            {"edgeWidth", glass.appearance.edge_width_percent}, {"chromatic", glass.appearance.chromatic_aberration_percent},
+            {"elementGlass", glass.appearance.element_glass_enabled}, {"elementZoom", glass.appearance.indicator_refraction_percent},
+            {"elementExtent", glass.appearance.indicator_width_percent}, {"elementSoftness", glass.appearance.element_softness_percent}}},
+        {"calmWater", {{"enabled", glass.calm_water.enabled}, {"intensity", glass.calm_water.intensity_percent},
+            {"speed", glass.calm_water.speed_percent}, {"wavelength", glass.calm_water.wavelength_percent}, {"noise", glass.calm_water.noise_percent}}},
+        {"liquid", {{"enabled", glass.liquid.enabled}, {"intensity", glass.liquid.intensity_percent},
+            {"speed", glass.liquid.speed_percent}, {"wavelength", glass.liquid.wavelength_percent},
+            {"fluidity", glass.liquid.fluidity_percent}, {"noise", glass.liquid.noise_percent}}},
+        {"rain", {{"enabled", glass.rain.enabled}, {"intensity", glass.rain.intensity_percent},
+            {"speed", glass.rain.speed_percent}, {"density", glass.rain.density_percent},
+            {"ringSize", glass.rain.ring_size_percent}, {"fade", glass.rain.fade_percent}}},
+    };
+}
+
+// Charge un bloc Glass tolerant en conservant les valeurs par defaut absentes.
+DeckGlassSettings ParseGlass(const nlohmann::json& json) {
+    DeckGlassSettings deck{};
+    if (!json.is_object()) return deck;
+    deck.enabled = json.value("enabled", deck.enabled);
+    deck.opacity_percent = std::clamp(json.value("opacity", deck.opacity_percent), 20, 100);
+    const auto appearance = json.value("appearance", nlohmann::json::object());
+    deck.effect.appearance.diffusion_percent = appearance.value("diffusion", deck.effect.appearance.diffusion_percent);
+    deck.effect.appearance.tint_percent = appearance.value("tint", deck.effect.appearance.tint_percent);
+    deck.effect.appearance.grain_percent = appearance.value("grain", deck.effect.appearance.grain_percent);
+    deck.effect.appearance.edge_refraction_percent = appearance.value("edgeRefraction", deck.effect.appearance.edge_refraction_percent);
+    deck.effect.appearance.edge_width_percent = appearance.value("edgeWidth", deck.effect.appearance.edge_width_percent);
+    deck.effect.appearance.chromatic_aberration_percent = appearance.value("chromatic", deck.effect.appearance.chromatic_aberration_percent);
+    deck.effect.appearance.element_glass_enabled = appearance.value("elementGlass", deck.effect.appearance.element_glass_enabled);
+    deck.effect.appearance.indicator_refraction_percent = appearance.value("elementZoom", deck.effect.appearance.indicator_refraction_percent);
+    deck.effect.appearance.indicator_width_percent = appearance.value("elementExtent", deck.effect.appearance.indicator_width_percent);
+    deck.effect.appearance.element_softness_percent = appearance.value("elementSoftness", deck.effect.appearance.element_softness_percent);
+    const auto calm = json.value("calmWater", nlohmann::json::object());
+    deck.effect.calm_water.enabled = calm.value("enabled", deck.effect.calm_water.enabled);
+    deck.effect.calm_water.intensity_percent = calm.value("intensity", deck.effect.calm_water.intensity_percent);
+    deck.effect.calm_water.speed_percent = calm.value("speed", deck.effect.calm_water.speed_percent);
+    deck.effect.calm_water.wavelength_percent = calm.value("wavelength", deck.effect.calm_water.wavelength_percent);
+    deck.effect.calm_water.noise_percent = calm.value("noise", deck.effect.calm_water.noise_percent);
+    const auto liquid = json.value("liquid", nlohmann::json::object());
+    deck.effect.liquid.enabled = liquid.value("enabled", deck.effect.liquid.enabled);
+    deck.effect.liquid.intensity_percent = liquid.value("intensity", deck.effect.liquid.intensity_percent);
+    deck.effect.liquid.speed_percent = liquid.value("speed", deck.effect.liquid.speed_percent);
+    deck.effect.liquid.wavelength_percent = liquid.value("wavelength", deck.effect.liquid.wavelength_percent);
+    deck.effect.liquid.fluidity_percent = liquid.value("fluidity", deck.effect.liquid.fluidity_percent);
+    deck.effect.liquid.noise_percent = liquid.value("noise", deck.effect.liquid.noise_percent);
+    const auto rain = json.value("rain", nlohmann::json::object());
+    deck.effect.rain.enabled = rain.value("enabled", deck.effect.rain.enabled);
+    deck.effect.rain.intensity_percent = rain.value("intensity", deck.effect.rain.intensity_percent);
+    deck.effect.rain.speed_percent = rain.value("speed", deck.effect.rain.speed_percent);
+    deck.effect.rain.density_percent = rain.value("density", deck.effect.rain.density_percent);
+    deck.effect.rain.ring_size_percent = rain.value("ringSize", deck.effect.rain.ring_size_percent);
+    deck.effect.rain.fade_percent = rain.value("fade", deck.effect.rain.fade_percent);
+    deck.effect = NormalizeGlassEffectSettings(deck.effect);
+    return deck;
+}
 
 // Convertit un mode de theme en valeur persistante.
 const char* ThemeName(ThemeMode mode) {
@@ -82,6 +146,7 @@ std::expected<DeckPreferences, StorageError> DeckPreferencesService::Load() {
     preferences.notify_errors = json.value("notifyErrors", true);
     preferences.notify_completions = json.value("notifyCompletions", true);
     preferences.reduced_motion_override = json.value("reducedMotionOverride", false);
+    preferences.glass = ParseGlass(json.value("glass", nlohmann::json::object()));
     return preferences;
 }
 
@@ -94,6 +159,7 @@ std::expected<void, StorageError> DeckPreferencesService::Save(const DeckPrefere
         {"notifyErrors", preferences.notify_errors},
         {"notifyCompletions", preferences.notify_completions},
         {"reducedMotionOverride", preferences.reduced_motion_override},
+        {"glass", GlassJson(preferences.glass)},
     }.dump();
     sqlite3_stmt* statement = nullptr;
     int result = sqlite3_prepare_v2(
