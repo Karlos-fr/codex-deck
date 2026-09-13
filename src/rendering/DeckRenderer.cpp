@@ -16,10 +16,14 @@
 #include "../navigation/TreeHitTesting.h"
 #include "../navigation/ProjectTreeView.h"
 #include "../navigation/TreeDragController.h"
+#include "../projects/ProjectEditorModel.h"
+#include "../projects/ProjectEditorView.h"
 #include "../ui/MainLayout.h"
 #include "../ui/ScrollState.h"
 #include "../ui/ScrollbarGeometry.h"
 #include "../ui/TreeVisualAnimation.h"
+#include "../sessions/NewSessionOverlayModel.h"
+#include "../sessions/NewSessionOverlayView.h"
 
 #include <dwrite.h>
 #include <wrl/client.h>
@@ -114,6 +118,27 @@ struct DeckRenderer::Impl {
 
     // Vue de Command Palette.
     CommandPaletteView command_palette_view;
+
+    // Vue de creation globale de session.
+    NewSessionOverlayView new_session_view;
+
+    // Etat optionnel du formulaire de creation.
+    std::optional<NewSessionOverlayModel> new_session_overlay;
+
+    // Vue de creation, renommage et suppression d'un projet logique.
+    ProjectEditorView project_editor_view;
+
+    // Etat optionnel de l'editeur de projet.
+    std::optional<ProjectEditorModel> project_editor;
+
+    // Catalogue de modeles connu du renderer.
+    std::vector<CodexModelInfo> available_models;
+
+    // Threads archives conserves hors du catalogue actif.
+    std::vector<CodexThreadSummary> archive_threads;
+
+    // Handler applicatif des commandes de cycle de vie.
+    DeckCommandHandler command_handler;
 
     // Controleur de drag interne du Tree.
     TreeDragController tree_drag;
@@ -415,14 +440,20 @@ SessionFilter ToggleFilter(SessionFilter current, SessionFilter requested) {
 // - filtre clique.
 // ----------------------------------------------------------------------------
 std::optional<SessionFilter> ActivityFilterAt(float x) {
-    if (x < 120.0F) {
+    if (x >= 14.0F && x < 112.0F) {
         return SessionFilter::Working;
     }
-    if (x < 250.0F) {
+    if (x < 218.0F) {
         return SessionFilter::NeedsAttention;
     }
-    if (x < 430.0F) {
+    if (x < 344.0F) {
         return SessionFilter::CompletedToday;
+    }
+    if (x < 444.0F) {
+        return SessionFilter::Favorites;
+    }
+    if (x < 544.0F) {
+        return SessionFilter::Archived;
     }
     return std::nullopt;
 }
@@ -592,6 +623,66 @@ std::string NarrowAscii(std::wstring_view text) {
     return narrow;
 }
 
+// Convertit un texte UTF-16 en UTF-8 pour les requetes Codex.
+std::string NarrowUtf8(std::wstring_view text) {
+    if (text.empty()) {
+        return {};
+    }
+    const int size = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
+    std::string result(static_cast<std::size_t>(std::max(0, size)), '\0');
+    if (size > 0) {
+        WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), result.data(), size, nullptr, nullptr);
+    }
+    return result;
+}
+
+// Convertit un texte UTF-8 en UTF-16 pour les overlays natifs.
+std::wstring WidenUtf8(std::string_view text) {
+    if (text.empty()) {
+        return {};
+    }
+    const int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), nullptr, 0);
+    if (size <= 0) {
+        return std::wstring(text.begin(), text.end());
+    }
+    std::wstring result(static_cast<std::size_t>(size), L'\0');
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()), result.data(), size);
+    return result;
+}
+
+// Retourne le projet associe a la selection courante.
+template <typename State>
+std::optional<ProjectId> CurrentProjectId(const State& state) {
+    if (!state.tree_rows.empty() && state.selected_tree_row < state.tree_rows.size()) {
+        const TreeRow& row = state.tree_rows[state.selected_tree_row];
+        if (row.project_id) {
+            return row.project_id;
+        }
+    }
+    if (state.tree_state.selected_thread) {
+        for (const SessionRecord& session : state.render_catalog.sessions) {
+            if (session.codex.id == *state.tree_state.selected_thread) {
+                return session.project_id;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+// Retourne la racine principale d'un projet.
+template <typename State>
+std::optional<std::filesystem::path> ProjectRoot(const State& state, std::optional<ProjectId> project_id) {
+    if (!project_id) {
+        return std::nullopt;
+    }
+    for (const Project& project : state.render_catalog.projects) {
+        if (project.id == *project_id && !project.roots.empty()) {
+            return project.roots.front();
+        }
+    }
+    return std::nullopt;
+}
+
 }  // namespace
 
 // Cree l'etat et demarre le worker persistant de recherche.
@@ -638,7 +729,19 @@ DeckRenderer::Impl::~Impl() {
 // ----------------------------------------------------------------------------
 void DeckRenderer::Impl::RebuildTreeRows() {
     SessionCatalogSnapshot visible_catalog = render_catalog;
-    visible_catalog.sessions = FilterSessions(render_catalog.sessions, active_filter);
+    if (active_filter == SessionFilter::Archived) {
+        visible_catalog.projects.clear();
+        visible_catalog.sessions.clear();
+        for (const CodexThreadSummary& thread : archive_threads) {
+            SessionRecord record{};
+            record.codex = thread;
+            record.present_in_codex = true;
+            visible_catalog.sessions.push_back(std::move(record));
+        }
+        tree_state.unassigned_expanded = true;
+    } else {
+        visible_catalog.sessions = FilterSessions(render_catalog.sessions, active_filter);
+    }
     tree_rows = BuildProjectTreeRows(visible_catalog, tree_state);
     if (!tree_rows.empty() && selected_tree_row >= tree_rows.size()) {
         selected_tree_row = tree_rows.size() - 1;
@@ -723,6 +826,28 @@ void DeckRenderer::Impl::ExecuteCommand(const DeckCommand& command) {
         command_palette_caret_epoch = std::chrono::steady_clock::now();
         RebuildCommandPalette();
         break;
+    case DeckCommandKind::NewSession: {
+        command_palette_open = false;
+        new_session_overlay = BuildNewSessionOverlayModel(render_catalog.projects, CurrentProjectId(*this));
+        new_session_overlay->models = available_models;
+        break;
+    }
+    case DeckCommandKind::NewSessionInCurrentProject: {
+        const std::optional<ProjectId> project_id = command.project_id ? command.project_id : CurrentProjectId(*this);
+        const auto root = command.cwd ? command.cwd : ProjectRoot(*this, project_id);
+        if (!project_id || !root) {
+            new_session_overlay = BuildNewSessionOverlayModel(render_catalog.projects, project_id);
+            new_session_overlay->models = available_models;
+            break;
+        }
+        if (command_handler) {
+            DeckCommand enriched = command;
+            enriched.project_id = project_id;
+            enriched.cwd = root;
+            command_handler(std::move(enriched));
+        }
+        break;
+    }
     case DeckCommandKind::OpenThread: {
         if (!command.thread_id) {
             break;
@@ -783,39 +908,89 @@ void DeckRenderer::Impl::ExecuteCommand(const DeckCommand& command) {
         break;
     }
     case DeckCommandKind::ArchiveThread: {
-        if (tree_rows.empty() || selected_tree_row >= tree_rows.size()) {
-            break;
+        DeckCommand enriched = command;
+        if (!enriched.thread_id && tree_state.selected_thread) {
+            enriched.thread_id = tree_state.selected_thread;
         }
-        const TreeRow& row = tree_rows[selected_tree_row];
-        if (row.kind != TreeRowKind::Session || !row.thread_id) {
-            break;
+        if (command_handler && enriched.thread_id) {
+            command_handler(std::move(enriched));
         }
-        for (SessionRecord& session : render_catalog.sessions) {
-            if (session.codex.id == *row.thread_id) {
-                session.codex.archived = true;
-                break;
-            }
-        }
-        RebuildTreeRows();
         break;
     }
     case DeckCommandKind::ToggleFavorite: {
-        if (tree_rows.empty() || selected_tree_row >= tree_rows.size()) {
-            break;
+        DeckCommand enriched = command;
+        if (!enriched.thread_id && tree_state.selected_thread) {
+            enriched.thread_id = tree_state.selected_thread;
         }
-        const TreeRow& row = tree_rows[selected_tree_row];
-        if (row.kind != TreeRowKind::Session || !row.thread_id) {
-            break;
+        if (command_handler && enriched.thread_id) {
+            command_handler(std::move(enriched));
         }
-        for (SessionRecord& session : render_catalog.sessions) {
-            if (session.codex.id == *row.thread_id) {
-                session.favorite = !session.favorite;
-                break;
-            }
-        }
-        RebuildTreeRows();
         break;
     }
+    case DeckCommandKind::NewProject:
+        command_palette_open = false;
+        if (command_handler) {
+            command_handler(command);
+        }
+        break;
+    case DeckCommandKind::RenameProject: {
+        const std::optional<ProjectId> project_id = command.project_id ? command.project_id : CurrentProjectId(*this);
+        if (!project_id) {
+            break;
+        }
+        const auto project = std::ranges::find_if(render_catalog.projects, [project_id](const Project& candidate) {
+            return candidate.id == *project_id;
+        });
+        if (project == render_catalog.projects.end()) {
+            break;
+        }
+        command_palette_open = false;
+        project_editor = ProjectEditorModel{
+            ProjectEditorMode::Rename,
+            project->id,
+            WidenUtf8(project->name),
+            project->roots.empty() ? std::filesystem::path{} : project->roots.front(),
+            0,
+            false,
+            {},
+        };
+        break;
+    }
+    case DeckCommandKind::DeleteProject: {
+        const std::optional<ProjectId> project_id = command.project_id ? command.project_id : CurrentProjectId(*this);
+        if (!project_id) {
+            break;
+        }
+        const auto project = std::ranges::find_if(render_catalog.projects, [project_id](const Project& candidate) {
+            return candidate.id == *project_id;
+        });
+        if (project == render_catalog.projects.end()) {
+            break;
+        }
+        command_palette_open = false;
+        project_editor = ProjectEditorModel{
+            ProjectEditorMode::ConfirmDelete,
+            project->id,
+            WidenUtf8(project->name),
+            project->roots.empty() ? std::filesystem::path{} : project->roots.front(),
+            0,
+            false,
+            {},
+        };
+        break;
+    }
+    case DeckCommandKind::OpenFolderAsSession:
+    case DeckCommandKind::PickSessionWorkspace:
+    case DeckCommandKind::OpenArchive:
+    case DeckCommandKind::RestoreArchivedThread:
+    case DeckCommandKind::SetThemeSystem:
+    case DeckCommandKind::SetThemeLight:
+    case DeckCommandKind::SetThemeDark:
+        command_palette_open = false;
+        if (command_handler) {
+            command_handler(command);
+        }
+        break;
     default:
         break;
     }
@@ -846,6 +1021,107 @@ DeckRenderer::DeckRenderer() = default;
 // Libere les ressources de rendu opaques.
 // ----------------------------------------------------------------------------
 DeckRenderer::~DeckRenderer() = default;
+
+// Installe le handler des commandes qui sortent du renderer.
+void DeckRenderer::SetCommandHandler(DeckCommandHandler handler) {
+    if (impl_ == nullptr) {
+        impl_ = std::make_unique<Impl>();
+    }
+    impl_->command_handler = std::move(handler);
+}
+
+// Met a jour le catalogue de modeles propose dans l'overlay de creation.
+void DeckRenderer::SetAvailableModels(std::vector<CodexModelInfo> models) {
+    if (impl_ == nullptr) {
+        impl_ = std::make_unique<Impl>();
+    }
+    impl_->available_models = std::move(models);
+    if (impl_->new_session_overlay) {
+        impl_->new_session_overlay->models = impl_->available_models;
+    }
+}
+
+// Selectionne un thread cree ou restaure depuis le thread UI.
+void DeckRenderer::SelectThread(const CodexThreadId& thread_id) {
+    if (impl_ == nullptr) {
+        return;
+    }
+    impl_->new_session_overlay.reset();
+    impl_->ExecuteCommand(DeckCommand{DeckCommandKind::OpenThread, std::nullopt, thread_id});
+}
+
+// Affiche une erreur de creation dans l'overlay encore ouvert.
+void DeckRenderer::SetSessionCreationError(std::wstring message) {
+    if (impl_ && impl_->new_session_overlay) {
+        impl_->new_session_overlay->submitting = false;
+        impl_->new_session_overlay->error = std::move(message);
+    }
+}
+
+// Remplace le workspace du formulaire apres le picker natif.
+void DeckRenderer::SetNewSessionWorkspacePath(std::filesystem::path workspace) {
+    if (impl_ && impl_->new_session_overlay) {
+        SetNewSessionWorkspace(*impl_->new_session_overlay, std::move(workspace));
+        impl_->new_session_overlay->active_field = 1;
+        impl_->new_session_overlay->error.clear();
+    }
+}
+
+// Ouvre l'editeur d'un nouveau projet apres choix de sa racine.
+void DeckRenderer::OpenNewProjectEditor(std::filesystem::path root) {
+    if (impl_ == nullptr) {
+        return;
+    }
+    std::wstring name = root.filename().wstring();
+    if (name.empty()) {
+        name = root.root_name().wstring();
+    }
+    impl_->project_editor = ProjectEditorModel{
+        ProjectEditorMode::Create,
+        std::nullopt,
+        std::move(name),
+        std::move(root),
+        0,
+        false,
+        {},
+    };
+}
+
+// Selectionne et deploie un projet cree depuis le worker stockage.
+void DeckRenderer::SelectProject(ProjectId project_id) {
+    if (impl_ == nullptr) {
+        return;
+    }
+    impl_->project_editor.reset();
+    impl_->ExecuteCommand(DeckCommand{DeckCommandKind::OpenWorkspace, project_id, std::nullopt});
+}
+
+// Affiche une erreur de gestion de projet dans l'overlay courant.
+void DeckRenderer::SetProjectEditorError(std::wstring message) {
+    if (impl_ && impl_->project_editor) {
+        impl_->project_editor->submitting = false;
+        impl_->project_editor->error = std::move(message);
+    }
+}
+
+// Ferme l'editeur apres une mutation terminee sans selection cible.
+void DeckRenderer::CloseProjectEditor() {
+    if (impl_) {
+        impl_->project_editor.reset();
+    }
+}
+
+// Publie les threads archives charges a la demande.
+void DeckRenderer::SetArchiveThreads(std::vector<CodexThreadSummary> threads) {
+    if (impl_ == nullptr) {
+        return;
+    }
+    impl_->archive_threads = std::move(threads);
+    impl_->active_filter = SessionFilter::Archived;
+    impl_->selected_tree_row = 0;
+    impl_->tree_scroll.offset = 0.0F;
+    impl_->RebuildTreeRows();
+}
 
 // ----------------------------------------------------------------------------
 // Initialise les factories et les ressources liees a la fenetre.
@@ -981,7 +1257,8 @@ void DeckRenderer::Render(
     impl_->tree_scroll.viewport_extent = std::max(0.0F, layout.tree.bottom - layout.tree.top);
     impl_->tree_scroll.content_extent = static_cast<float>(impl_->tree_rows.size()) * impl_->tree_view.RowHeight();
     impl_->tree_scroll.Clamp();
-    const ActivityCounts counts = BuildActivityCounts(impl_->render_catalog.sessions);
+    ActivityCounts counts = BuildActivityCounts(impl_->render_catalog.sessions);
+    counts.archived = impl_->archive_threads.size();
     impl_->activity_bar_view.Render(
         context,
         ToD2DRect(layout.activity_bar),
@@ -1056,6 +1333,22 @@ void DeckRenderer::Render(
             palette
         );
     }
+    if (impl_->new_session_overlay) {
+        impl_->new_session_view.Render(
+            context,
+            D2D1::RectF(0.0F, 0.0F, size.width, size.height),
+            *impl_->new_session_overlay,
+            palette
+        );
+    }
+    if (impl_->project_editor) {
+        impl_->project_editor_view.Render(
+            context,
+            D2D1::RectF(0.0F, 0.0F, size.width, size.height),
+            *impl_->project_editor,
+            palette
+        );
+    }
     if (!impl_->composition.EndDraw().has_value()) {
         DiscardDeviceResources();
     }
@@ -1095,6 +1388,84 @@ void DeckRenderer::OnPointerDown(float x, float y) {
     if (impl_ == nullptr) {
         return;
     }
+    if (impl_->project_editor) {
+        const D2D1_RECT_F bounds = D2D1::RectF(0.0F, 0.0F, impl_->viewport_size.width, impl_->viewport_size.height);
+        ProjectEditorModel& editor = *impl_->project_editor;
+        const ProjectEditorHitTarget target = impl_->project_editor_view.HitTest(bounds, editor, x, y);
+        if (target == ProjectEditorHitTarget::Cancel) {
+            impl_->project_editor.reset();
+        } else if (target == ProjectEditorHitTarget::Name) {
+            editor.active_field = 0;
+        } else if (target == ProjectEditorHitTarget::Submit && !editor.submitting) {
+            if (editor.mode != ProjectEditorMode::ConfirmDelete && editor.name.empty()) {
+                editor.error = L"Enter a project name";
+            } else {
+                DeckCommand command{};
+                command.kind = editor.mode == ProjectEditorMode::Create
+                    ? DeckCommandKind::NewProject
+                    : editor.mode == ProjectEditorMode::Rename
+                        ? DeckCommandKind::RenameProject
+                        : DeckCommandKind::DeleteProject;
+                command.project_id = editor.project_id;
+                command.cwd = editor.root;
+                if (editor.mode != ProjectEditorMode::ConfirmDelete) {
+                    command.display_name = NarrowUtf8(editor.name);
+                }
+                editor.submitting = true;
+                if (impl_->command_handler) {
+                    impl_->command_handler(std::move(command));
+                }
+            }
+        }
+        return;
+    }
+    if (impl_->new_session_overlay) {
+        const D2D1_RECT_F bounds = D2D1::RectF(0.0F, 0.0F, impl_->viewport_size.width, impl_->viewport_size.height);
+        const NewSessionOverlayHitTarget target = impl_->new_session_view.HitTest(bounds, x, y);
+        NewSessionOverlayModel& overlay = *impl_->new_session_overlay;
+        switch (target) {
+        case NewSessionOverlayHitTarget::Project:
+            overlay.active_field = 0;
+            break;
+        case NewSessionOverlayHitTarget::Workspace:
+            overlay.active_field = 1;
+            break;
+        case NewSessionOverlayHitTarget::Browse:
+            if (impl_->command_handler) {
+                impl_->command_handler(DeckCommand{DeckCommandKind::PickSessionWorkspace});
+            }
+            break;
+        case NewSessionOverlayHitTarget::Model:
+            overlay.active_field = 2;
+            break;
+        case NewSessionOverlayHitTarget::Prompt:
+            overlay.active_field = 3;
+            break;
+        case NewSessionOverlayHitTarget::Cancel:
+            impl_->new_session_overlay.reset();
+            break;
+        case NewSessionOverlayHitTarget::Create:
+            if (overlay.workspace.empty()) {
+                overlay.error = L"Choose a workspace";
+                overlay.active_field = 1;
+            } else if (!overlay.submitting) {
+                DeckCommand create{DeckCommandKind::NewSession, overlay.project_id, std::nullopt};
+                create.cwd = overlay.workspace;
+                create.model = overlay.model;
+                if (!overlay.prompt.empty()) {
+                    create.initial_prompt = NarrowUtf8(overlay.prompt);
+                }
+                overlay.submitting = true;
+                if (impl_->command_handler) {
+                    impl_->command_handler(std::move(create));
+                }
+            }
+            break;
+        case NewSessionOverlayHitTarget::None:
+            break;
+        }
+        return;
+    }
     if (impl_->command_palette_open) {
         const D2D1_RECT_F bounds = D2D1::RectF(0.0F, 0.0F, impl_->viewport_size.width, impl_->viewport_size.height);
         if (const auto hit = impl_->command_palette_view.HitTestEntry(
@@ -1127,6 +1498,9 @@ void DeckRenderer::OnPointerDown(float x, float y) {
             impl_->selected_tree_row = 0;
             impl_->tree_scroll.offset = 0.0F;
             impl_->RebuildTreeRows();
+            if (*filter == SessionFilter::Archived && impl_->active_filter == SessionFilter::Archived && impl_->command_handler) {
+                impl_->command_handler(DeckCommand{DeckCommandKind::OpenArchive});
+            }
         }
         return;
     }
@@ -1159,6 +1533,23 @@ void DeckRenderer::OnPointerDown(float x, float y) {
     }
     impl_->selected_tree_row = *hit;
     impl_->tree_row_focus_visible = true;
+    const TreeRow clicked_row = impl_->tree_rows[*hit];
+    if (impl_->active_filter == SessionFilter::Archived
+        && clicked_row.kind == TreeRowKind::Session
+        && clicked_row.thread_id) {
+        DeckCommand restore{DeckCommandKind::RestoreArchivedThread, std::nullopt, clicked_row.thread_id};
+        if (impl_->command_handler) {
+            impl_->command_handler(std::move(restore));
+        }
+        return;
+    }
+    if (clicked_row.kind == TreeRowKind::Project
+        && clicked_row.project_id
+        && x >= tree_bounds.right - 38.0F) {
+        DeckCommand create{DeckCommandKind::NewSessionInCurrentProject, clicked_row.project_id, std::nullopt};
+        impl_->ExecuteCommand(create);
+        return;
+    }
     impl_->tree_drag.Begin(impl_->tree_rows[*hit], TreeDragPoint{x, y});
     impl_->tree_view.ActivateRow(impl_->tree_rows[*hit]);
     ActivateTreeRow(impl_->tree_state, impl_->tree_rows[*hit]);
@@ -1267,10 +1658,20 @@ bool DeckRenderer::IsPointOnSplitter(float x, float y) const {
 
 // Indique si un point touche le champ de saisie de la palette ouverte.
 bool DeckRenderer::IsPointOnTextInput(float x, float y) const {
-    if (impl_ == nullptr || !impl_->command_palette_open) {
+    if (impl_ == nullptr) {
         return false;
     }
     const D2D1_RECT_F bounds = D2D1::RectF(0.0F, 0.0F, impl_->viewport_size.width, impl_->viewport_size.height);
+    if (impl_->project_editor) {
+        return impl_->project_editor_view.HitTest(bounds, *impl_->project_editor, x, y) == ProjectEditorHitTarget::Name;
+    }
+    if (impl_->new_session_overlay) {
+        const NewSessionOverlayHitTarget target = impl_->new_session_view.HitTest(bounds, x, y);
+        return target == NewSessionOverlayHitTarget::Workspace || target == NewSessionOverlayHitTarget::Prompt;
+    }
+    if (!impl_->command_palette_open) {
+        return false;
+    }
     return impl_->command_palette_view.IsPointOnQuery(
         bounds,
         impl_->command_palette_entries.size(),
@@ -1361,6 +1762,107 @@ bool DeckRenderer::OnKeyDown(WPARAM virtual_key) {
         return false;
     }
     impl_->ApplyPendingCommandPaletteResult();
+
+    if (impl_->project_editor) {
+        ProjectEditorModel& editor = *impl_->project_editor;
+        if (virtual_key == VK_ESCAPE) {
+            impl_->project_editor.reset();
+            return true;
+        }
+        if (editor.mode != ProjectEditorMode::ConfirmDelete && virtual_key == VK_BACK) {
+            if (!editor.name.empty()) {
+                editor.name.pop_back();
+            }
+            editor.error.clear();
+            return true;
+        }
+        if (virtual_key == VK_RETURN && !editor.submitting) {
+            if (editor.mode != ProjectEditorMode::ConfirmDelete && editor.name.empty()) {
+                editor.error = L"Enter a project name";
+                return true;
+            }
+            DeckCommand command{};
+            command.kind = editor.mode == ProjectEditorMode::Create
+                ? DeckCommandKind::NewProject
+                : editor.mode == ProjectEditorMode::Rename
+                    ? DeckCommandKind::RenameProject
+                    : DeckCommandKind::DeleteProject;
+            command.project_id = editor.project_id;
+            command.cwd = editor.root;
+            if (editor.mode != ProjectEditorMode::ConfirmDelete) {
+                command.display_name = NarrowUtf8(editor.name);
+            }
+            editor.submitting = true;
+            if (impl_->command_handler) {
+                impl_->command_handler(std::move(command));
+            }
+            return true;
+        }
+        return true;
+    }
+
+    if (impl_->new_session_overlay) {
+        NewSessionOverlayModel& overlay = *impl_->new_session_overlay;
+        if (virtual_key == VK_ESCAPE) {
+            impl_->new_session_overlay.reset();
+            return true;
+        }
+        if (virtual_key == VK_TAB) {
+            overlay.active_field = (overlay.active_field + (IsShiftDown() ? 3 : 1)) % 4;
+            return true;
+        }
+        if ((virtual_key == VK_UP || virtual_key == VK_DOWN) && overlay.active_field == 0) {
+            std::vector<std::optional<ProjectId>> choices{std::nullopt};
+            for (const Project& project : overlay.projects) {
+                choices.push_back(project.id);
+            }
+            const auto current = std::ranges::find(choices, overlay.project_id);
+            std::size_t index = current == choices.end() ? 0 : static_cast<std::size_t>(std::distance(choices.begin(), current));
+            index = virtual_key == VK_DOWN ? (index + 1) % choices.size() : (index + choices.size() - 1) % choices.size();
+            SelectNewSessionProject(overlay, choices[index]);
+            return true;
+        }
+        if ((virtual_key == VK_UP || virtual_key == VK_DOWN) && overlay.active_field == 2 && !overlay.models.empty()) {
+            std::vector<std::optional<std::string>> choices{std::nullopt};
+            for (const CodexModelInfo& model : overlay.models) {
+                choices.push_back(model.id);
+            }
+            const auto current = std::ranges::find(choices, overlay.model);
+            std::size_t index = current == choices.end() ? 0 : static_cast<std::size_t>(std::distance(choices.begin(), current));
+            index = virtual_key == VK_DOWN ? (index + 1) % choices.size() : (index + choices.size() - 1) % choices.size();
+            overlay.model = choices[index];
+            return true;
+        }
+        if (virtual_key == VK_BACK && (overlay.active_field == 1 || overlay.active_field == 3)) {
+            if (overlay.active_field == 1 && !overlay.workspace.empty()) {
+                std::wstring value = overlay.workspace.wstring();
+                value.pop_back();
+                SetNewSessionWorkspace(overlay, value);
+            } else if (overlay.active_field == 3 && !overlay.prompt.empty()) {
+                overlay.prompt.pop_back();
+            }
+            return true;
+        }
+        if (virtual_key == VK_RETURN && !overlay.submitting) {
+            if (overlay.workspace.empty()) {
+                overlay.error = L"Choose a workspace";
+                overlay.active_field = 1;
+                return true;
+            }
+            DeckCommand create{DeckCommandKind::NewSession, overlay.project_id, std::nullopt};
+            create.cwd = overlay.workspace;
+            create.model = overlay.model;
+            if (!overlay.prompt.empty()) {
+                create.initial_prompt = NarrowUtf8(overlay.prompt);
+            }
+            overlay.submitting = true;
+            if (impl_->command_handler) {
+                impl_->command_handler(std::move(create));
+            }
+            return true;
+        }
+        return true;
+    }
 
     if (impl_->rename_active) {
         if (virtual_key == VK_ESCAPE) {
@@ -1496,6 +1998,19 @@ bool DeckRenderer::OnKeyDown(WPARAM virtual_key) {
     case VK_LEFT:
     case VK_RIGHT:
         impl_->tree_row_focus_visible = true;
+        if (virtual_key == VK_RETURN
+            && impl_->active_filter == SessionFilter::Archived
+            && impl_->tree_rows[impl_->selected_tree_row].thread_id) {
+            DeckCommand restore{
+                DeckCommandKind::RestoreArchivedThread,
+                std::nullopt,
+                impl_->tree_rows[impl_->selected_tree_row].thread_id,
+            };
+            if (impl_->command_handler) {
+                impl_->command_handler(std::move(restore));
+            }
+            return true;
+        }
         impl_->tree_view.ActivateRow(impl_->tree_rows[impl_->selected_tree_row]);
         ActivateTreeRow(impl_->tree_state, impl_->tree_rows[impl_->selected_tree_row]);
         impl_->RebuildTreeRows();
@@ -1511,6 +2026,32 @@ bool DeckRenderer::OnKeyDown(WPARAM virtual_key) {
 bool DeckRenderer::OnChar(wchar_t character) {
     if (impl_ == nullptr) {
         return false;
+    }
+    if (impl_->project_editor) {
+        ProjectEditorModel& editor = *impl_->project_editor;
+        if (editor.mode == ProjectEditorMode::ConfirmDelete
+            || character == L'\b' || character == L'\r' || character == L'\n' || character == L'\t'
+            || std::iswcntrl(character) != 0) {
+            return true;
+        }
+        editor.name.push_back(character);
+        editor.error.clear();
+        return true;
+    }
+    if (impl_->new_session_overlay) {
+        if (character == L'\b' || character == L'\r' || character == L'\n' || character == L'\t'
+            || std::iswcntrl(character) != 0) {
+            return true;
+        }
+        NewSessionOverlayModel& overlay = *impl_->new_session_overlay;
+        if (overlay.active_field == 1) {
+            std::wstring value = overlay.workspace.wstring();
+            value.push_back(character);
+            SetNewSessionWorkspace(overlay, value);
+        } else if (overlay.active_field == 3) {
+            overlay.prompt.push_back(character);
+        }
+        return true;
     }
     if (impl_->rename_active) {
         if (character == L'\b' || character == L'\r' || character == L'\n' || character == L'\t') {

@@ -22,6 +22,23 @@ using CodexThreadId = std::string;
 using CodexTurnId = std::string;
 
 // ----------------------------------------------------------------------------
+// Modele disponible expose par le catalogue Codex.
+// ----------------------------------------------------------------------------
+struct CodexModelInfo {
+    // Identifiant wire stable du modele.
+    std::string id;
+
+    // Nom humain affiche par Codex.
+    std::string display_name;
+
+    // Indique le choix par defaut du serveur.
+    bool is_default = false;
+
+    // Efforts de raisonnement reellement proposes.
+    std::vector<std::string> supported_efforts;
+};
+
+// ----------------------------------------------------------------------------
 // Resume leger d'un thread retourne par les listes Codex.
 // ----------------------------------------------------------------------------
 struct CodexThreadSummary {

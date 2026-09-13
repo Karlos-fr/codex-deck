@@ -11,14 +11,21 @@
 #include "../model/SessionCatalog.h"
 #include "../rendering/DeckRenderer.h"
 #include "../settings/DeckSettings.h"
+#include "../settings/DeckPreferences.h"
 #include "../theme/Theme.h"
+#include "../sync/ExternalSessionRefreshScheduler.h"
 
 #include <windows.h>
 
 #include <atomic>
 #include <condition_variable>
+#include <deque>
+#include <functional>
 #include <mutex>
 #include <thread>
+
+// Connexion SQLite opaque utilisee uniquement par les callbacks du worker.
+class SqliteDatabase;
 
 // ----------------------------------------------------------------------------
 // Application native principale de Codex Deck.
@@ -81,6 +88,18 @@ private:
     // ------------------------------------------------------------------------
     void RefreshSessionsFromCodex(CodexClient& client, HWND hwnd);
 
+    // Traite une commande de cycle de vie emise par le renderer.
+    void HandleDeckCommand(HWND hwnd, DeckCommand command);
+
+    // Lance une creation de session sur le worker Codex.
+    void SubmitSessionCreation(HWND hwnd, DeckCommand command);
+
+    // Place une operation SQLite dans la file du worker stockage.
+    void SubmitStorageTask(std::move_only_function<void(SqliteDatabase&)> task);
+
+    // Lance un probe recent via le client connecte.
+    void RequestExternalSessionProbe(HWND hwnd);
+
     // Renderer Direct2D minimal de la coquille.
     DeckRenderer renderer_;
 
@@ -96,6 +115,9 @@ private:
     // Reglages locaux de la coquille.
     DeckSettings settings_{};
 
+    // Preferences persistantes completes.
+    DeckPreferences preferences_{};
+
     // Theme concret actuellement applique.
     ResolvedTheme resolved_theme_ = ResolvedTheme::Light;
 
@@ -108,9 +130,18 @@ private:
     // Reveille le worker lorsqu'une sync est demandee ou lors de l'arret.
     std::condition_variable storage_condition_;
 
+    // Operations SQLite ponctuelles executees hors thread UI.
+    std::deque<std::move_only_function<void(SqliteDatabase&)>> storage_tasks_;
+
     // Indique qu'un refresh Codex/local est demande.
     bool storage_refresh_requested_ = false;
 
     // Indique que le worker de stockage doit s'arreter.
     std::atomic_bool storage_stopping_ = false;
+
+    // Scheduler deterministe des probes d'autres clients.
+    ExternalSessionRefreshScheduler external_refresh_scheduler_{true};
+
+    // Dernier fingerprint recent observe.
+    std::optional<std::uint64_t> external_session_fingerprint_;
 };

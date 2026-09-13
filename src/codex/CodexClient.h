@@ -24,6 +24,18 @@ struct ThreadListOptions {
 
     // Filtre optionnel par repertoire de travail.
     std::optional<std::filesystem::path> cwd;
+
+    // Cle de tri comprise par app-server.
+    std::string sort_key = "recency_at";
+
+    // Direction de tri comprise par app-server.
+    std::string sort_direction = "desc";
+
+    // Nombre maximal d'elements, ou aucun pour une liste exhaustive.
+    std::optional<std::size_t> max_items;
+
+    // Limite le probe a la base d'etat Codex.
+    bool use_state_db_only = false;
 };
 
 // ----------------------------------------------------------------------------
@@ -60,6 +72,9 @@ using ThreadDetailCompletion = std::move_only_function<void(std::expected<CodexT
 // Completion pour une liste de threads.
 using ThreadListCompletion = std::move_only_function<void(std::expected<std::vector<CodexThreadSummary>, CodexError>)>;
 
+// Completion pour le catalogue de modeles.
+using ModelListCompletion = std::move_only_function<void(std::expected<std::vector<CodexModelInfo>, CodexError>)>;
+
 // Completion pour un identifiant de tour.
 using TurnCompletion = std::move_only_function<void(std::expected<CodexTurnId, CodexError>)>;
 
@@ -92,6 +107,14 @@ public:
     // - completion : callback recevant la liste exhaustive.
     // ------------------------------------------------------------------------
     void ListThreads(ThreadListOptions options, ThreadListCompletion completion);
+
+    // ------------------------------------------------------------------------
+    // Liste exhaustivement les modeles proposes par app-server.
+    //
+    // Parametres :
+    // - completion : callback recevant les modeles dans l'ordre serveur.
+    // ------------------------------------------------------------------------
+    void ListModels(ModelListCompletion completion);
 
     // ------------------------------------------------------------------------
     // Lit passivement un thread avec ses tours.
@@ -138,6 +161,11 @@ public:
     // - completion : callback de confirmation.
     // ------------------------------------------------------------------------
     void ArchiveThread(CodexThreadId thread_id, VoidCompletion completion);
+
+    // ------------------------------------------------------------------------
+    // Restaure un thread archive cote Codex.
+    // ------------------------------------------------------------------------
+    void UnarchiveThread(CodexThreadId thread_id, VoidCompletion completion);
 
     // ------------------------------------------------------------------------
     // Lance un tour dans un thread.

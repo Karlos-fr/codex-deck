@@ -144,6 +144,17 @@ void CodexSupervisor::Stop() {
         worker_.request_stop();
         worker_.join();
     }
+    std::lock_guard lock(client_tasks_mutex_);
+    client_tasks_.clear();
+}
+
+// Place une operation dans la file du client connecte.
+void CodexSupervisor::Submit(ClientTask task) {
+    if (!task || stopping_) {
+        return;
+    }
+    std::lock_guard lock(client_tasks_mutex_);
+    client_tasks_.push_back(std::move(task));
 }
 
 // ----------------------------------------------------------------------------
@@ -230,6 +241,7 @@ void CodexSupervisor::Run(LaunchSpecFactory factory) {
         reconnect_attempt = 0;
 
         while (!stopping_) {
+            DrainClientTasks(client);
             {
                 std::unique_lock lock(mutex);
                 condition.wait_for(lock, std::chrono::milliseconds(100), [&]() {
@@ -250,6 +262,18 @@ void CodexSupervisor::Run(LaunchSpecFactory factory) {
             PublishState(CodexConnectionState::Reconnecting);
             InterruptibleBackoff(BackoffDelay(reconnect_attempt++), stopping_);
         }
+    }
+}
+
+// Execute les taches accumulees avec le client connecte courant.
+void CodexSupervisor::DrainClientTasks(CodexClient& client) {
+    std::deque<ClientTask> tasks;
+    {
+        std::lock_guard lock(client_tasks_mutex_);
+        tasks.swap(client_tasks_);
+    }
+    for (ClientTask& task : tasks) {
+        task(client);
     }
 }
 

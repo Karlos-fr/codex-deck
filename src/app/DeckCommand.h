@@ -11,6 +11,8 @@
 #include "../projects/ProjectTypes.h"
 
 #include <optional>
+#include <filesystem>
+#include <string>
 
 // ----------------------------------------------------------------------------
 // Type de commande applicative.
@@ -51,6 +53,36 @@ enum class DeckCommandKind {
 
     // Basculer vers la session runtime suivante.
     CycleRuntimeSession,
+
+    // Charger la vue des threads archives.
+    OpenArchive,
+
+    // Restaurer un thread archive.
+    RestoreArchivedThread,
+
+    // Creer un projet logique local.
+    NewProject,
+
+    // Renommer le projet courant.
+    RenameProject,
+
+    // Supprimer le projet logique courant.
+    DeleteProject,
+
+    // Creer une session depuis un dossier choisi.
+    OpenFolderAsSession,
+
+    // Choisir le workspace du formulaire de session sans creer encore.
+    PickSessionWorkspace,
+
+    // Suivre le theme Windows.
+    SetThemeSystem,
+
+    // Forcer le theme clair.
+    SetThemeLight,
+
+    // Forcer le theme sombre.
+    SetThemeDark,
 };
 
 // ----------------------------------------------------------------------------
@@ -65,4 +97,16 @@ struct DeckCommand {
 
     // Thread cible optionnel.
     std::optional<CodexThreadId> thread_id;
+
+    // Workspace cible optionnel d'une creation.
+    std::optional<std::filesystem::path> cwd;
+
+    // Modele optionnel d'une creation.
+    std::optional<std::string> model;
+
+    // Prompt initial optionnel d'une creation.
+    std::optional<std::string> initial_prompt;
+
+    // Libelle saisi pour une mutation de projet.
+    std::optional<std::string> display_name;
 };

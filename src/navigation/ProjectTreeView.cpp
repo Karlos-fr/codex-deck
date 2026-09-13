@@ -49,8 +49,8 @@ constexpr float kSelectionInsetX = 6.0F;
 // Marge verticale de la selection active.
 constexpr float kSelectionInsetY = 3.0F;
 
-// Decalage optique du fond pour laisser respirer les jambages inferieurs.
-constexpr float kSelectionOffsetY = 4.0F;
+// Decalage nul maintenant le fond centre sur la ligne DirectWrite.
+constexpr float kSelectionOffsetY = 0.0F;
 
 // Rayon de la selection active.
 constexpr float kSelectionRadius = 6.0F;
@@ -521,6 +521,11 @@ void ProjectTreeView::Render(
                 dc->DrawLine(D2D1::Point2F(x + 3.0F, cy - 5.0F), D2D1::Point2F(x + 8.0F, cy), impl_->muted_brush.Get(), 1.25F);
                 dc->DrawLine(D2D1::Point2F(x + 8.0F, cy), D2D1::Point2F(x + 3.0F, cy + 5.0F), impl_->muted_brush.Get(), 1.25F);
             }
+            if (row.kind == TreeRowKind::Project) {
+                const float plus_x = bounds.right - effective_scrollbar_width - 18.0F;
+                dc->DrawLine(D2D1::Point2F(plus_x - 4.0F, cy), D2D1::Point2F(plus_x + 4.0F, cy), impl_->muted_brush.Get(), 1.25F);
+                dc->DrawLine(D2D1::Point2F(plus_x, cy - 4.0F), D2D1::Point2F(plus_x, cy + 4.0F), impl_->muted_brush.Get(), 1.25F);
+            }
         }
         if (row.kind == TreeRowKind::Session) {
             if (row.status != SessionStatus::Idle) {
@@ -530,9 +535,10 @@ void ProjectTreeView::Render(
         }
 
         const float text_left = row.kind == TreeRowKind::Session ? x + 8.0F : x + 16.0F;
+        const float row_action_inset = row.kind == TreeRowKind::Project ? 28.0F : 0.0F;
         const float text_right = selected
             ? std::max(text_left + 1.0F, selection.right - 6.0F)
-            : bounds.right - kTreePaddingX - effective_scrollbar_width - 2.0F;
+            : bounds.right - kTreePaddingX - effective_scrollbar_width - 2.0F - row_action_inset;
         const float text_width = std::max(1.0F, text_right - text_left);
         const float natural_text_width = impl_->NaturalTextWidth(row);
         const bool text_truncated = natural_text_width > text_width + 1.0F;

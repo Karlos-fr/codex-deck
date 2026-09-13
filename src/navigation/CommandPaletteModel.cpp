@@ -94,13 +94,20 @@ struct StaticAction {
 };
 
 // Actions globales exposees dans la palette.
-constexpr std::array<StaticAction, 6> kActions{{
+constexpr std::array<StaticAction, 13> kActions{{
     {"action:new-session", L"new session", DeckCommandKind::NewSession},
     {"action:new-session-current-project", L"new session current project", DeckCommandKind::NewSessionInCurrentProject},
     {"action:rename-thread", L"rename thread", DeckCommandKind::RenameThread},
     {"action:archive-thread", L"archive thread", DeckCommandKind::ArchiveThread},
     {"action:toggle-favorite", L"toggle favorite", DeckCommandKind::ToggleFavorite},
     {"action:detach-workbench", L"detach workbench", DeckCommandKind::DetachWorkbench},
+    {"action:new-project", L"new project", DeckCommandKind::NewProject},
+    {"action:rename-project", L"rename project", DeckCommandKind::RenameProject},
+    {"action:delete-project", L"remove project", DeckCommandKind::DeleteProject},
+    {"action:open-folder", L"open folder as session", DeckCommandKind::OpenFolderAsSession},
+    {"action:theme-system", L"theme follow system", DeckCommandKind::SetThemeSystem},
+    {"action:theme-light", L"theme light", DeckCommandKind::SetThemeLight},
+    {"action:theme-dark", L"theme dark", DeckCommandKind::SetThemeDark},
 }};
 
 // ----------------------------------------------------------------------------

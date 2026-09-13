@@ -12,6 +12,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <deque>
 #include <expected>
 #include <functional>
 #include <mutex>
@@ -50,6 +51,9 @@ public:
 
     // Handler de client connecte.
     using ConnectedClientHandler = std::move_only_function<void(CodexClient&)>;
+
+    // Tache a executer avec le client courant sur le worker superviseur.
+    using ClientTask = std::move_only_function<void(CodexClient&)>;
 
     // ------------------------------------------------------------------------
     // Cree un superviseur inactif.
@@ -106,6 +110,14 @@ public:
     // ------------------------------------------------------------------------
     void Stop();
 
+    // ------------------------------------------------------------------------
+    // Place une operation dans la file du client connecte.
+    //
+    // Parametres :
+    // - task : operation non bloquante a lancer sur le worker.
+    // ------------------------------------------------------------------------
+    void Submit(ClientTask task);
+
 private:
     // ------------------------------------------------------------------------
     // Boucle de supervision worker.
@@ -139,6 +151,9 @@ private:
     // ------------------------------------------------------------------------
     void PublishConnectedClient(CodexClient& client);
 
+    // Execute les taches accumulees avec le client connecte courant.
+    void DrainClientTasks(CodexClient& client);
+
     // Thread de supervision.
     std::jthread worker_;
 
@@ -156,4 +171,10 @@ private:
 
     // Callback de client connecte courant.
     ConnectedClientHandler connected_client_handler_;
+
+    // Protege la file des operations applicatives.
+    std::mutex client_tasks_mutex_;
+
+    // Operations en attente d'un client connecte.
+    std::deque<ClientTask> client_tasks_;
 };

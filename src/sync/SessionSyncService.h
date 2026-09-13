@@ -11,6 +11,7 @@
 #include "../model/SessionCatalog.h"
 #include "../projects/ProjectDetector.h"
 #include "../storage/SqliteDatabase.h"
+#include "ExternalSessionProbe.h"
 
 #include <expected>
 #include <functional>
@@ -65,6 +66,11 @@ public:
     // ------------------------------------------------------------------------
     std::expected<std::shared_ptr<const SessionCatalogSnapshot>, StorageError> RequestRefreshFromCodex();
 
+    // ------------------------------------------------------------------------
+    // Compare le probe recent et declenche une sync complete si necessaire.
+    // ------------------------------------------------------------------------
+    std::expected<bool, StorageError> ProbeExternalChanges();
+
 private:
     // Base SQLite non possedee.
     SqliteDatabase& database_;
@@ -86,4 +92,7 @@ private:
 
     // Indique qu'un autre passage est demande apres le refresh courant.
     bool refresh_requested_again_ = false;
+
+    // Fingerprint du dernier probe ou snapshot complet accepte.
+    std::optional<std::uint64_t> recent_fingerprint_;
 };

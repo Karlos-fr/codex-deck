@@ -64,9 +64,12 @@ nlohmann::json Success(const nlohmann::json& id, nlohmann::json result) {
 // ----------------------------------------------------------------------------
 int main(int argc, char** argv) {
     bool exit_after_initialize = false;
+    bool fail_turn_start = false;
     for (int index = 1; index < argc; ++index) {
         if (std::string(argv[index]) == "--exit-after-initialize") {
             exit_after_initialize = true;
+        } else if (std::string(argv[index]) == "--fail-turn-start") {
+            fail_turn_start = true;
         }
     }
 
@@ -90,7 +93,41 @@ int main(int argc, char** argv) {
         } else if (!initialized) {
             WriteResponse({{"jsonrpc", "2.0"}, {"id", id}, {"error", {{"code", -32001}, {"message", "not initialized"}}}});
         } else if (method == "thread/list") {
-            WriteResponse(Success(id, {{"data", nlohmann::json::array({current_thread})}, {"nextCursor", nullptr}}));
+            const nlohmann::json& params = request.at("params");
+            if (params.value("useStateDbOnly", false)) {
+                const bool valid_probe = params.value("limit", 0) == 100
+                    && params.value("sortKey", "") == "recency_at"
+                    && params.value("sortDirection", "") == "desc"
+                    && !params.value("archived", true);
+                if (!valid_probe || params.contains("cursor")) {
+                    WriteResponse({{"jsonrpc", "2.0"}, {"id", id}, {"error", {{"code", -32602}, {"message", "invalid probe options"}}}});
+                    continue;
+                }
+                nlohmann::json data = nlohmann::json::array();
+                for (int index = 0; index < 100; ++index) {
+                    nlohmann::json thread = current_thread;
+                    thread["id"] = "probe_" + std::to_string(index);
+                    data.push_back(std::move(thread));
+                }
+                WriteResponse(Success(id, {{"data", std::move(data)}, {"nextCursor", "must-not-be-requested"}}));
+            } else {
+                WriteResponse(Success(id, {{"data", nlohmann::json::array({current_thread})}, {"nextCursor", nullptr}}));
+            }
+        } else if (method == "model/list") {
+            const nlohmann::json& params = request.at("params");
+            if (params.value("limit", 0) != 100) {
+                WriteResponse({{"jsonrpc", "2.0"}, {"id", id}, {"error", {{"code", -32602}, {"message", "invalid model limit"}}}});
+            } else if (!params.contains("cursor")) {
+                WriteResponse(Success(id, {{"data", nlohmann::json::array({
+                    {{"id", "gpt-5-codex"}, {"displayName", "GPT-5 Codex"}, {"isDefault", true}, {"supportedEfforts", {"medium", "high"}}, {"unknown", 42}}
+                })}, {"nextCursor", "models-page-2"}}));
+            } else if (params.value("cursor", "") == "models-page-2") {
+                WriteResponse(Success(id, {{"data", nlohmann::json::array({
+                    {{"id", "gpt-5-mini"}, {"displayName", "GPT-5 mini"}, {"supportedEfforts", {"low"}}}
+                })}, {"nextCursor", nullptr}}));
+            } else {
+                WriteResponse({{"jsonrpc", "2.0"}, {"id", id}, {"error", {{"code", -32602}, {"message", "invalid model cursor"}}}});
+            }
         } else if (method == "thread/read") {
             nlohmann::json thread = current_thread;
             thread["id"] = request.at("params").value("threadId", "thr_123");
@@ -111,9 +148,16 @@ int main(int argc, char** argv) {
         } else if (method == "thread/archive") {
             current_thread["archived"] = true;
             WriteResponse(Success(id, nlohmann::json::object()));
+        } else if (method == "thread/unarchive") {
+            current_thread["archived"] = false;
+            WriteResponse(Success(id, nlohmann::json::object()));
         } else if (method == "turn/start") {
             const std::string thread_id = request.at("params").value("threadId", "thr_new");
-            WriteResponse(Success(id, {{"turnId", "turn_1"}}));
+            if (fail_turn_start) {
+                WriteResponse({{"jsonrpc", "2.0"}, {"id", id}, {"error", {{"code", -32099}, {"message", "turn rejected"}}}});
+            } else {
+                WriteResponse(Success(id, {{"turnId", "turn_1"}}));
+            }
             WriteResponse({{"jsonrpc", "2.0"}, {"method", "turn/started"}, {"params", {{"threadId", thread_id}, {"turnId", "turn_1"}}}});
             WriteResponse({{"jsonrpc", "2.0"}, {"method", "turn/completed"}, {"params", {{"threadId", thread_id}, {"turnId", "turn_1"}}}});
         } else if (method == "exit") {

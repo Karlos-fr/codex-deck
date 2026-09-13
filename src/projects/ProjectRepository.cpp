@@ -196,6 +196,19 @@ std::expected<std::vector<Project>, StorageError> ProjectRepository::List() {
     return result;
 }
 
+// Renomme un projet logique existant.
+std::expected<void, StorageError> ProjectRepository::Rename(ProjectId project_id, std::string_view name) {
+    Statement statement(database_, "UPDATE projects SET name=?, updated_at=? WHERE id=?;");
+    if (!statement.ok()) {
+        return std::unexpected(statement.error());
+    }
+    sqlite3_bind_text(statement.get(), 1, name.data(), static_cast<int>(name.size()), SQLITE_TRANSIENT);
+    sqlite3_bind_int64(statement.get(), 2, NowMillis());
+    sqlite3_bind_int64(statement.get(), 3, project_id);
+    const int step = sqlite3_step(statement.get());
+    return step == SQLITE_DONE ? std::expected<void, StorageError>{} : std::unexpected(SqlError(database_, step));
+}
+
 // ----------------------------------------------------------------------------
 // Ajoute une racine a un projet.
 // ----------------------------------------------------------------------------

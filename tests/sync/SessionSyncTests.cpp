@@ -217,6 +217,66 @@ int TestRefreshRequestsAreCoalesced() {
 }
 
 // ----------------------------------------------------------------------------
+// Verifie qu'un probe externe declenche une seule sync et conserve le manuel.
+//
+// Retour :
+// - zero si creation et renommage externes sont reconcilies correctement.
+// ----------------------------------------------------------------------------
+int TestExternalProbeRefreshesChangedCatalog() {
+    auto database = CreateTestDatabase(L"-external-probe");
+    ProjectRepository projects(database);
+    auto manual_project = projects.Create("Manual");
+    if (!manual_project) {
+        return 18;
+    }
+    SessionMetadataRepository metadata(database);
+    if (auto cached = metadata.UpsertCache("A", "Alpha", "D:\\manual", 2, SessionStatus::Idle); !cached) {
+        return 19;
+    }
+    if (auto assigned = metadata.SetAssignment("A", manual_project->id, AssignmentSource::Manual); !assigned) {
+        return 20;
+    }
+
+    int probe_calls = 0;
+    int full_calls = 0;
+    EmptyGitProbe git_probe;
+    SessionCatalog catalog;
+    SessionSyncService service(database, catalog, git_probe, [&](ThreadListOptions options) {
+        const bool changed = options.max_items ? ++probe_calls >= 2 : ++full_calls >= 2;
+        std::vector<CodexThreadSummary> threads{
+            Thread("A", changed ? "Alpha renamed" : "Alpha", "D:\\external", 2),
+            Thread("B", "Beta", "D:\\b", 1),
+        };
+        if (changed) {
+            threads.insert(threads.begin(), Thread("C", "Charlie", "D:\\c", 3));
+        }
+        return std::expected<std::vector<CodexThreadSummary>, CodexError>{std::move(threads)};
+    });
+
+    if (auto initial = service.RefreshFromCodex(); !initial) {
+        return 21;
+    }
+    auto stable = service.ProbeExternalChanges();
+    auto changed = service.ProbeExternalChanges();
+    if (!stable || *stable || !changed || !*changed || full_calls != 2) {
+        return 22;
+    }
+    const auto snapshot = catalog.Current();
+    bool saw_a = false;
+    bool saw_c = false;
+    for (const SessionRecord& session : snapshot->sessions) {
+        if (session.codex.id == "A") {
+            saw_a = session.codex.name == "Alpha renamed"
+                && session.project_id == manual_project->id
+                && session.assignment_source == AssignmentSource::Manual;
+        } else if (session.codex.id == "C") {
+            saw_c = true;
+        }
+    }
+    return saw_a && saw_c ? 0 : 23;
+}
+
+// ----------------------------------------------------------------------------
 // Execute les tests de synchronisation.
 //
 // Retour :
@@ -230,6 +290,9 @@ int main() {
         return result;
     }
     if (const int result = TestRefreshRequestsAreCoalesced(); result != 0) {
+        return result;
+    }
+    if (const int result = TestExternalProbeRefreshesChangedCatalog(); result != 0) {
         return result;
     }
     return 0;

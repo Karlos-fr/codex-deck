@@ -139,10 +139,12 @@ void ActivityBarView::Render(
     g_activity_bar_resources.accent_text_brush->SetColor(D2D1::ColorF(D2D1::ColorF::White));
     dc->FillRectangle(bounds, g_activity_bar_resources.background_brush.Get());
 
-    const std::array<ActivityChip, 3> chips{{
+    const std::array<ActivityChip, 5> chips{{
         {SessionFilter::Working, L"Working", counts.working},
         {SessionFilter::NeedsAttention, L"Attention", counts.needs_attention},
         {SessionFilter::CompletedToday, L"Done today", counts.completed_today},
+        {SessionFilter::Favorites, L"Favorites", counts.favorites},
+        {SessionFilter::Archived, L"Archive", counts.archived},
     }};
 
     float x = bounds.left + kActivityBarPaddingX;

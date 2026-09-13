@@ -8,12 +8,14 @@
 #pragma once
 
 #include "../graphics/CompositionHost.h"
+#include "../app/DeckCommand.h"
 #include "../model/SessionCatalog.h"
 #include "../theme/ThemePalette.h"
 
 #include <windows.h>
 
 #include <memory>
+#include <functional>
 #include <string>
 
 // ----------------------------------------------------------------------------
@@ -26,6 +28,9 @@ struct DeckVisualState {
     // Sous-titre de bootstrap affiche sous le titre.
     std::wstring subtitle = L"Native Codex workbench";
 };
+
+// Handler des commandes de cycle de vie deleguees a DeckApp.
+using DeckCommandHandler = std::function<void(DeckCommand)>;
 
 // ----------------------------------------------------------------------------
 // Gere les ressources graphiques et le dessin de la coquille native.
@@ -52,6 +57,36 @@ public:
     // - true si le rendu peut commencer.
     // ------------------------------------------------------------------------
     bool Initialize(HWND hwnd);
+
+    // Installe le handler des commandes qui sortent du renderer.
+    void SetCommandHandler(DeckCommandHandler handler);
+
+    // Met a jour le catalogue de modeles propose dans l'overlay de creation.
+    void SetAvailableModels(std::vector<CodexModelInfo> models);
+
+    // Selectionne un thread cree ou restaure depuis le thread UI.
+    void SelectThread(const CodexThreadId& thread_id);
+
+    // Affiche une erreur de creation dans l'overlay encore ouvert.
+    void SetSessionCreationError(std::wstring message);
+
+    // Remplace le workspace du formulaire apres le picker natif.
+    void SetNewSessionWorkspacePath(std::filesystem::path workspace);
+
+    // Ouvre l'editeur d'un nouveau projet apres choix de sa racine.
+    void OpenNewProjectEditor(std::filesystem::path root);
+
+    // Selectionne et deploie un projet cree depuis le worker stockage.
+    void SelectProject(ProjectId project_id);
+
+    // Affiche une erreur de gestion de projet dans l'overlay courant.
+    void SetProjectEditorError(std::wstring message);
+
+    // Ferme l'editeur apres une mutation terminee sans selection cible.
+    void CloseProjectEditor();
+
+    // Publie les threads archives charges a la demande.
+    void SetArchiveThreads(std::vector<CodexThreadSummary> threads);
 
     // ------------------------------------------------------------------------
     // Redimensionne la cible Direct2D pour suivre le client Win32.

@@ -37,7 +37,7 @@
 - Produces: `ListModels()`.
 - Extends: `ThreadListOptions` avec tri, limite et `use_state_db_only` pour les refresh probes.
 
-- [ ] **Step 1: Définir un modèle minimal**
+- [x] **Step 1: Définir un modèle minimal**
 
 ```cpp
 struct CodexModelInfo {
@@ -50,7 +50,7 @@ struct CodexModelInfo {
 
 Le parser ignore les champs modèle inconnus et garde uniquement les valeurs réellement disponibles.
 
-- [ ] **Step 2: Écrire le test `model/list` paginé**
+- [x] **Step 2: Écrire le test `model/list` paginé**
 
 Le fake renvoie deux pages. `ListModels()` doit concaténer et préserver l’ordre serveur.
 
@@ -62,7 +62,7 @@ Wire initial :
 
 Puis réutiliser `nextCursor` jusqu’à `null`.
 
-- [ ] **Step 3: Étendre `ThreadListOptions`**
+- [x] **Step 3: Étendre `ThreadListOptions`**
 
 Le contrat final devient :
 
@@ -79,7 +79,7 @@ struct ThreadListOptions {
 
 `max_items == nullopt` signifie pagination exhaustive. Une valeur `100` permet un probe récent sans scanner toutes les pages.
 
-- [ ] **Step 4: Encoder les options exactement**
+- [x] **Step 4: Encoder les options exactement**
 
 ```json
 {
@@ -93,7 +93,7 @@ struct ThreadListOptions {
 
 Pour un appel exhaustif, poursuivre `nextCursor`. Pour un probe `max_items=100`, arrêter après 100 entrées même si un cursor existe.
 
-- [ ] **Step 5: Valider et commit**
+- [x] **Step 5: Valider et commit**
 
 ```powershell
 cmake --build --preset debug
@@ -122,7 +122,7 @@ git commit -m "feat: expose Codex model and recent thread catalogs"
 - Produces: Create/Rename/Delete logical project.
 - Produces: `PickFolder(HWND owner) -> expected<optional<path>, PlatformError>`.
 
-- [ ] **Step 1: Ajouter les commandes**
+- [x] **Step 1: Ajouter les commandes**
 
 ```cpp
 enum class DeckCommandKind {
@@ -134,23 +134,23 @@ enum class DeckCommandKind {
 };
 ```
 
-- [ ] **Step 2: Écrire les tests controller**
+- [x] **Step 2: Écrire les tests controller**
 
 Cas : créer `SpotifyAmp` avec root `D:\VibeCoding\spotifyamp`, renommer en `SpotifyAmp Native`, supprimer. Après suppression, les `session_metadata.project_id` deviennent `NULL` via FK ; si leur association était manuelle, conserver `assignment_source=Manual`, ce qui signifie Unassigned explicite.
 
-- [ ] **Step 3: Implémenter le folder picker natif**
+- [x] **Step 3: Implémenter le folder picker natif**
 
 Utiliser `IFileOpenDialog`, `FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST`. Annulation utilisateur retourne `std::nullopt`, pas une erreur.
 
-- [ ] **Step 4: Construire l’overlay projet**
+- [x] **Step 4: Construire l’overlay projet**
 
 Champs V1 : `Name`, `Root folder`. Le nom par défaut est `root.filename()`. Après création réussie : rafraîchir catalogue, développer le nouveau projet et le sélectionner dans l’arbre.
 
-- [ ] **Step 5: Suppression avec confirmation non système**
+- [x] **Step 5: Suppression avec confirmation non système**
 
 Overlay Codex Deck : expliquer que seul le projet logique local est supprimé ; aucun fichier/repo/session Codex n’est supprimé. Actions `Cancel` / `Remove project`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/projects src/platform src/app src/navigation tests/projects
@@ -172,7 +172,7 @@ git commit -m "feat: manage logical Codex Deck projects"
 **Interfaces:**
 - Produces: `CreateSession(CreateSessionRequest, completion)`.
 
-- [ ] **Step 1: Définir la requête**
+- [x] **Step 1: Définir la requête**
 
 ```cpp
 struct CreateSessionRequest {
@@ -188,19 +188,19 @@ struct CreatedSession {
 };
 ```
 
-- [ ] **Step 2: Écrire le test projet courant**
+- [x] **Step 2: Écrire le test projet courant**
 
 Input : project SpotifyAmp avec root principal, model null, prompt null. Vérifier `thread/start` avec cwd et sans override model. Au succès : métadonnée locale auto associée au project, session injectée dans catalogue, callback sélection session.
 
-- [ ] **Step 3: Écrire le test prompt initial**
+- [x] **Step 3: Écrire le test prompt initial**
 
 Si `initial_prompt` non vide : attendre succès `thread/start`, puis appeler `turn/start` avec input texte. Si `turn/start` échoue, la session créée reste valide/ouverte et le prompt optimiste est marqué en erreur ; ne pas supprimer le thread.
 
-- [ ] **Step 4: Implémenter création et association**
+- [x] **Step 4: Implémenter création et association**
 
 `SessionCreationController` ne duplique pas la logique de `ProjectDetector`. Si project explicite : `ProjectAssignmentService::AssignManual(thread_id, project_id)` après création. Si aucun projet explicite : laisser la sync auto détecter à partir de `cwd`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/sessions src/codex tests/sessions
@@ -226,13 +226,13 @@ git commit -m "feat: create Codex sessions from Deck"
 - Produces: global `Ctrl+N` overlay.
 - Consumes: `ListModels`, `SessionCreationController`, `FolderPicker`.
 
-- [ ] **Step 1: Tester le modèle global**
+- [x] **Step 1: Tester le modèle global**
 
 État initial : project courant pré-sélectionné si disponible, sinon `Unassigned`; workspace = root principal du projet sélectionné, sinon vide ; model = `Default`; prompt vide.
 
 Changer project recalcule workspace seulement si l’utilisateur ne l’avait pas modifié manuellement.
 
-- [ ] **Step 2: Créer le global `Ctrl+N` overlay**
+- [x] **Step 2: Créer le global `Ctrl+N` overlay**
 
 Disposition compacte :
 
@@ -248,19 +248,19 @@ Prompt     [ optional multiline field ]
 
 Le chargement `model/list` est asynchrone ; l’overlay reste utilisable avec `Default` si la liste n’est pas encore disponible ou échoue.
 
-- [ ] **Step 3: Implémenter `Ctrl+Shift+N`**
+- [x] **Step 3: Implémenter `Ctrl+Shift+N`**
 
 Précondition : projet courant avec au moins un root. Appeler immédiatement `CreateSessionRequest{project_id,currentRoot,nullopt,nullopt}`. À succès, sélectionner la session et focaliser son Workbench/composer. Si aucun projet courant : ouvrir le global `Ctrl+N` plutôt que faire échouer silencieusement.
 
-- [ ] **Step 4: Ajouter `+ New session` sur Project row/context menu**
+- [x] **Step 4: Ajouter `+ New session` sur Project row/context menu**
 
 Même flux immédiat que `Ctrl+Shift+N`, avec project id de la ligne. Aucun dialogue intermédiaire.
 
-- [ ] **Step 5: Ajouter `Open folder…`**
+- [x] **Step 5: Ajouter `Open folder…`**
 
 FolderPicker → `CreateSessionRequest{nullopt, folder, nullopt, nullopt}`. Après création, la session est sélectionnée. La sync lui attribue un projet connu si possible ; sinon `Unassigned`.
 
-- [ ] **Step 6: Valider et commit**
+- [x] **Step 6: Valider et commit**
 
 ```powershell
 ctest --preset debug -R "NewSessionOverlayModelTests|SessionCreationControllerTests" --output-on-failure
@@ -289,15 +289,15 @@ git commit -m "feat: add fast Codex session creation flows"
 - Produces: `ToggleFavorite(thread_id)` optimistic + rollback.
 - Produces: lazy `LoadArchive()` et `RestoreArchivedThread()`.
 
-- [ ] **Step 1: Écrire le test favori**
+- [x] **Step 1: Écrire le test favori**
 
 Toggle false→true publie snapshot immédiatement, persiste SQLite, et rollback si repository renvoie erreur.
 
-- [ ] **Step 2: Implémenter filtre Favorites**
+- [x] **Step 2: Implémenter filtre Favorites**
 
 L’entrée globale `★ Favorites` réutilise le catalogue actif et ne fait aucun RPC.
 
-- [ ] **Step 3: Étendre le fake et client pour `thread/unarchive`**
+- [x] **Step 3: Étendre le fake et client pour `thread/unarchive`**
 
 Ajouter :
 
@@ -307,15 +307,15 @@ void UnarchiveThread(CodexThreadId thread_id, VoidCompletion completion);
 
 Wire : `thread/unarchive` `{threadId}`.
 
-- [ ] **Step 4: Charger Archive à la demande**
+- [x] **Step 4: Charger Archive à la demande**
 
 `ListThreads({.archived=true})` exhaustif à l’ouverture de la vue. Afficher liste virtualisée par activité récente. La vue n’insère pas ces threads dans l’arbre principal.
 
-- [ ] **Step 5: Restaurer**
+- [x] **Step 5: Restaurer**
 
 Après succès `thread/unarchive`, invalider archive cache puis `SessionSyncService::RequestRefresh()`. Le thread réapparaît dans son association locale précédente si la métadonnée existe, sinon auto-détection.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/sessions src/navigation src/codex tests/sessions
@@ -339,7 +339,7 @@ git commit -m "feat: complete favorites and archive lifecycle"
 - Produces: foreground interval 15 s, background interval 60 s, immediate probe on app activation.
 - Produces: cheap first-page probe, full refresh only on detected change.
 
-- [ ] **Step 1: Écrire le test scheduler déterministe**
+- [x] **Step 1: Écrire le test scheduler déterministe**
 
 Avec clock injectée :
 
@@ -350,7 +350,7 @@ activation background→foreground -> probe immédiat
 sync/probe déjà actif -> coalescer, jamais deux appels simultanés
 ```
 
-- [ ] **Step 2: Définir le fingerprint récent**
+- [x] **Step 2: Définir le fingerprint récent**
 
 Probe :
 
@@ -366,19 +366,19 @@ ThreadListOptions{
 
 Fingerprint = hash stable des tuples `(thread.id, thread.name, thread.cwd, thread.updated_at)` des 100 plus récents.
 
-- [ ] **Step 3: Implémenter probe → full sync**
+- [x] **Step 3: Implémenter probe → full sync**
 
 Si fingerprint identique au précédent : rien. Si différent : appeler `RequestRefresh()` exhaustif. Après full sync réussi, recalculer le fingerprint depuis les 100 sessions actives les plus récentes du snapshot local.
 
-- [ ] **Step 4: Brancher activation fenêtre**
+- [x] **Step 4: Brancher activation fenêtre**
 
 Sur `WM_ACTIVATEAPP(TRUE)`, appeler `RequestImmediateProbe()`. Sur passage background, changer seulement l’intervalle ; ne pas arrêter les sessions Codex locales.
 
-- [ ] **Step 5: Tester création/rename externes**
+- [x] **Step 5: Tester création/rename externes**
 
 Fake : probe1 A/B ; probe2 C/A-renamed/B → full sync attendu une fois, catalogue contient C et nom mis à jour pour A, association manuelle éventuelle conservée.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/sync src/app tests/sync
@@ -401,7 +401,7 @@ git commit -m "feat: detect Codex sessions changed by other clients"
 - Produces: `SetThemeMode(System|Light|Dark)` avec persistance locale.
 - Prépare les flags notification du plan hardening sans dépendre de ce module futur.
 
-- [ ] **Step 1: Définir préférences**
+- [x] **Step 1: Définir préférences**
 
 ```cpp
 struct DeckPreferences {
@@ -415,7 +415,7 @@ struct DeckPreferences {
 
 Stocker sous `workspace_state['preferences']` en JSON versionné séparé de la géométrie fenêtres.
 
-- [ ] **Step 2: Ajouter actions palette**
+- [x] **Step 2: Ajouter actions palette**
 
 ```text
 Theme: Follow system
@@ -425,11 +425,11 @@ Theme: Dark
 
 L’action change immédiatement le thème global et persiste hors thread UI via le save scheduler.
 
-- [ ] **Step 3: Ajouter Toggle Favorite à la palette/context menu**
+- [x] **Step 3: Ajouter Toggle Favorite à la palette/context menu**
 
 Le command mapping existant appelle `FavoriteService`, pas directement SQLite.
 
-- [ ] **Step 4: Valider et commit**
+- [x] **Step 4: Valider et commit**
 
 ```bash
 git add src/settings src/navigation src/theme tests/settings

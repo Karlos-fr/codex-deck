@@ -10,6 +10,7 @@
 #include "../projects/ProjectRepository.h"
 #include "../storage/SessionMetadataRepository.h"
 
+#include <algorithm>
 #include <map>
 #include <set>
 #include <utility>
@@ -188,7 +189,21 @@ std::expected<std::shared_ptr<const SessionCatalogSnapshot>, StorageError> Sessi
             snapshot.sessions.push_back(CachedRecord(metadata));
         }
     }
-    return catalog_.Publish(std::move(snapshot));
+    auto published = catalog_.Publish(std::move(snapshot));
+    std::vector<CodexThreadSummary> recent;
+    for (const SessionRecord& session : published->sessions) {
+        if (session.present_in_codex && !session.codex.archived) {
+            recent.push_back(session.codex);
+        }
+    }
+    std::ranges::stable_sort(recent, [](const CodexThreadSummary& left, const CodexThreadSummary& right) {
+        return left.updated_at > right.updated_at;
+    });
+    if (recent.size() > 100) {
+        recent.resize(100);
+    }
+    recent_fingerprint_ = RecentSessionFingerprint(recent);
+    return published;
 }
 
 // ----------------------------------------------------------------------------
@@ -216,4 +231,27 @@ std::expected<std::shared_ptr<const SessionCatalogSnapshot>, StorageError> Sessi
         }
         refresh_requested_again_ = false;
     }
+}
+
+// Compare le probe recent et declenche une sync complete si necessaire.
+std::expected<bool, StorageError> SessionSyncService::ProbeExternalChanges() {
+    ThreadListOptions options{};
+    options.max_items = 100;
+    options.use_state_db_only = true;
+    auto threads = loader_(options);
+    if (!threads) {
+        return std::unexpected(CodexAsStorageError(threads.error()));
+    }
+    const std::uint64_t fingerprint = RecentSessionFingerprint(*threads);
+    if (!recent_fingerprint_) {
+        recent_fingerprint_ = fingerprint;
+        return false;
+    }
+    if (*recent_fingerprint_ == fingerprint) {
+        return false;
+    }
+    if (auto refreshed = RequestRefreshFromCodex(); !refreshed) {
+        return std::unexpected(refreshed.error());
+    }
+    return true;
 }

@@ -12,6 +12,14 @@ Codex Deck est un client Windows natif, rapide et léger pour piloter plusieurs 
 
 Le projet est actuellement en pré-alpha et part du socle éprouvé de [Codex Glass](https://github.com/Karlos-fr/codex-glass).
 
+## Fonctions disponibles
+
+- création, renommage et suppression de projets logiques locaux sans modifier les dossiers ou dépôts Git ;
+- création rapide de sessions dans le projet courant, depuis un dossier ou via le formulaire global ;
+- favoris locaux, consultation et restauration des sessions archivées ;
+- détection périodique des sessions créées ou renommées depuis un autre client Codex ;
+- thème système, clair ou sombre mémorisé localement.
+
 ## Cible
 
 - Windows 11 x64

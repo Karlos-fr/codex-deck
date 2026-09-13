@@ -45,6 +45,11 @@ public:
     std::expected<std::vector<Project>, StorageError> List();
 
     // ------------------------------------------------------------------------
+    // Renomme un projet logique existant.
+    // ------------------------------------------------------------------------
+    std::expected<void, StorageError> Rename(ProjectId project_id, std::string_view name);
+
+    // ------------------------------------------------------------------------
     // Ajoute une racine a un projet.
     //
     // Parametres :

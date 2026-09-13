@@ -123,15 +123,20 @@ add_executable(CodexDeck WIN32
     src/model/SessionCatalog.cpp
     src/navigation/ActivityBarModel.cpp
     src/navigation/ActivityBarView.cpp
+    src/navigation/ArchiveViewModel.cpp
     src/navigation/CommandPaletteModel.cpp
     src/navigation/CommandPaletteView.cpp
     src/navigation/ProjectTreeModel.cpp
     src/navigation/ProjectTreeView.cpp
     src/navigation/TreeHitTesting.cpp
     src/navigation/TreeDragController.cpp
+    src/platform/FolderPicker.cpp
     src/projects/GitProjectProbe.cpp
     src/projects/PathNormalization.cpp
     src/projects/ProjectDetector.cpp
+    src/projects/ProjectEditorView.cpp
+    src/projects/ProjectManagementController.cpp
+    src/projects/ProjectAssignmentService.cpp
     src/projects/ProjectRepository.cpp
     src/rendering/DeckRenderer.cpp
     src/resources/CodexDeck.rc
@@ -140,7 +145,15 @@ add_executable(CodexDeck WIN32
     src/storage/SessionMetadataRepository.cpp
     src/storage/SqliteDatabase.cpp
     src/sync/SessionSyncService.cpp
+    src/sync/ExternalSessionProbe.cpp
+    src/sync/ExternalSessionRefreshScheduler.cpp
     src/search/FuzzyMatcher.cpp
+    src/settings/DeckPreferencesService.cpp
+    src/sessions/SessionCreationController.cpp
+    src/sessions/NewSessionOverlayModel.cpp
+    src/sessions/NewSessionOverlayView.cpp
+    src/sessions/ArchiveSessionService.cpp
+    src/sessions/FavoriteService.cpp
     src/ui/MainLayout.cpp
     src/ui/ScrollState.cpp
     src/ui/ScrollbarGeometry.cpp
@@ -207,6 +220,133 @@ if(MSVC)
         $<$<CONFIG:Release>:/OPT:REF>
         $<$<CONFIG:Release>:/OPT:ICF>
     )
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/settings/DeckPreferencesServiceTests.cpp")
+    add_executable(DeckPreferencesServiceTests
+        tests/settings/DeckPreferencesServiceTests.cpp
+        src/settings/DeckPreferencesService.cpp
+        src/storage/SchemaMigrator.cpp
+        src/storage/SqliteDatabase.cpp
+    )
+    codex_deck_enable_cpp23(DeckPreferencesServiceTests)
+    codex_deck_enable_msvc_defaults(DeckPreferencesServiceTests)
+    target_include_directories(DeckPreferencesServiceTests PRIVATE src)
+    target_compile_definitions(DeckPreferencesServiceTests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+    target_link_libraries(DeckPreferencesServiceTests PRIVATE sqlite3 nlohmann_json::nlohmann_json)
+    add_test(NAME DeckPreferencesServiceTests COMMAND DeckPreferencesServiceTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/sync/ExternalSessionRefreshSchedulerTests.cpp")
+    add_executable(ExternalSessionRefreshSchedulerTests
+        tests/sync/ExternalSessionRefreshSchedulerTests.cpp
+        src/sync/ExternalSessionRefreshScheduler.cpp
+    )
+    codex_deck_enable_cpp23(ExternalSessionRefreshSchedulerTests)
+    codex_deck_enable_msvc_defaults(ExternalSessionRefreshSchedulerTests)
+    target_include_directories(ExternalSessionRefreshSchedulerTests PRIVATE src)
+    add_test(NAME ExternalSessionRefreshSchedulerTests COMMAND ExternalSessionRefreshSchedulerTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/sync/ExternalSessionProbeTests.cpp")
+    add_executable(ExternalSessionProbeTests
+        tests/sync/ExternalSessionProbeTests.cpp
+        src/sync/ExternalSessionProbe.cpp
+    )
+    codex_deck_enable_cpp23(ExternalSessionProbeTests)
+    codex_deck_enable_msvc_defaults(ExternalSessionProbeTests)
+    target_include_directories(ExternalSessionProbeTests PRIVATE src)
+    target_link_libraries(ExternalSessionProbeTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME ExternalSessionProbeTests COMMAND ExternalSessionProbeTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/sessions/FavoriteServiceTests.cpp")
+    add_executable(FavoriteServiceTests
+        tests/sessions/FavoriteServiceTests.cpp
+        src/model/SessionCatalog.cpp
+        src/sessions/FavoriteService.cpp
+        src/storage/SchemaMigrator.cpp
+        src/storage/SessionMetadataRepository.cpp
+        src/storage/SqliteDatabase.cpp
+    )
+    codex_deck_enable_cpp23(FavoriteServiceTests)
+    codex_deck_enable_msvc_defaults(FavoriteServiceTests)
+    target_include_directories(FavoriteServiceTests PRIVATE src)
+    target_compile_definitions(FavoriteServiceTests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+    target_link_libraries(FavoriteServiceTests PRIVATE sqlite3 nlohmann_json::nlohmann_json)
+    add_test(NAME FavoriteServiceTests COMMAND FavoriteServiceTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/sessions/ArchiveSessionServiceTests.cpp")
+    add_executable(ArchiveSessionServiceTests
+        tests/sessions/ArchiveSessionServiceTests.cpp
+        src/codex/CodexClient.cpp
+        src/codex/CodexProcess.cpp
+        src/codex/CodexProtocol.cpp
+        src/codex/JsonRpcTransport.cpp
+        src/navigation/ArchiveViewModel.cpp
+        src/sessions/ArchiveSessionService.cpp
+    )
+    codex_deck_enable_cpp23(ArchiveSessionServiceTests)
+    codex_deck_enable_msvc_defaults(ArchiveSessionServiceTests)
+    target_include_directories(ArchiveSessionServiceTests PRIVATE src)
+    target_compile_definitions(ArchiveSessionServiceTests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+    target_link_libraries(ArchiveSessionServiceTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME ArchiveSessionServiceTests COMMAND ArchiveSessionServiceTests $<TARGET_FILE:FakeAppServer>)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/sessions/NewSessionOverlayModelTests.cpp")
+    add_executable(NewSessionOverlayModelTests
+        tests/sessions/NewSessionOverlayModelTests.cpp
+        src/sessions/NewSessionOverlayModel.cpp
+    )
+    codex_deck_enable_cpp23(NewSessionOverlayModelTests)
+    codex_deck_enable_msvc_defaults(NewSessionOverlayModelTests)
+    target_include_directories(NewSessionOverlayModelTests PRIVATE src)
+    target_link_libraries(NewSessionOverlayModelTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME NewSessionOverlayModelTests COMMAND NewSessionOverlayModelTests)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/sessions/SessionCreationControllerTests.cpp")
+    add_executable(SessionCreationControllerTests
+        tests/sessions/SessionCreationControllerTests.cpp
+        src/codex/CodexClient.cpp
+        src/codex/CodexProcess.cpp
+        src/codex/CodexProtocol.cpp
+        src/codex/JsonRpcTransport.cpp
+        src/model/SessionCatalog.cpp
+        src/projects/PathNormalization.cpp
+        src/projects/ProjectAssignmentService.cpp
+        src/projects/ProjectRepository.cpp
+        src/sessions/SessionCreationController.cpp
+        src/storage/SchemaMigrator.cpp
+        src/storage/SessionMetadataRepository.cpp
+        src/storage/SqliteDatabase.cpp
+    )
+    codex_deck_enable_cpp23(SessionCreationControllerTests)
+    codex_deck_enable_msvc_defaults(SessionCreationControllerTests)
+    target_include_directories(SessionCreationControllerTests PRIVATE src)
+    target_compile_definitions(SessionCreationControllerTests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+    target_link_libraries(SessionCreationControllerTests PRIVATE sqlite3 nlohmann_json::nlohmann_json)
+    add_test(NAME SessionCreationControllerTests COMMAND SessionCreationControllerTests $<TARGET_FILE:FakeAppServer>)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/projects/ProjectManagementControllerTests.cpp")
+    add_executable(ProjectManagementControllerTests
+        tests/projects/ProjectManagementControllerTests.cpp
+        src/projects/PathNormalization.cpp
+        src/projects/ProjectManagementController.cpp
+        src/projects/ProjectRepository.cpp
+        src/storage/SchemaMigrator.cpp
+        src/storage/SessionMetadataRepository.cpp
+        src/storage/SqliteDatabase.cpp
+    )
+    codex_deck_enable_cpp23(ProjectManagementControllerTests)
+    codex_deck_enable_msvc_defaults(ProjectManagementControllerTests)
+    target_include_directories(ProjectManagementControllerTests PRIVATE src)
+    target_compile_definitions(ProjectManagementControllerTests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+    target_link_libraries(ProjectManagementControllerTests PRIVATE sqlite3 nlohmann_json::nlohmann_json)
+    add_test(NAME ProjectManagementControllerTests COMMAND ProjectManagementControllerTests)
 endif()
 
 if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/SingleInstanceTests.cpp")
@@ -381,6 +521,38 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/codex/CodexClient
     add_test(NAME CodexClientTests COMMAND CodexClientTests $<TARGET_FILE:FakeAppServer>)
 endif()
 
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/codex/CodexModelListTests.cpp")
+    add_executable(CodexModelListTests
+        tests/codex/CodexModelListTests.cpp
+        src/codex/CodexClient.cpp
+        src/codex/CodexProcess.cpp
+        src/codex/CodexProtocol.cpp
+        src/codex/JsonRpcTransport.cpp
+    )
+    codex_deck_enable_cpp23(CodexModelListTests)
+    codex_deck_enable_msvc_defaults(CodexModelListTests)
+    target_include_directories(CodexModelListTests PRIVATE src)
+    target_compile_definitions(CodexModelListTests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+    target_link_libraries(CodexModelListTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME CodexModelListTests COMMAND CodexModelListTests $<TARGET_FILE:FakeAppServer>)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/codex/CodexThreadListOptionsTests.cpp")
+    add_executable(CodexThreadListOptionsTests
+        tests/codex/CodexThreadListOptionsTests.cpp
+        src/codex/CodexClient.cpp
+        src/codex/CodexProcess.cpp
+        src/codex/CodexProtocol.cpp
+        src/codex/JsonRpcTransport.cpp
+    )
+    codex_deck_enable_cpp23(CodexThreadListOptionsTests)
+    codex_deck_enable_msvc_defaults(CodexThreadListOptionsTests)
+    target_include_directories(CodexThreadListOptionsTests PRIVATE src)
+    target_compile_definitions(CodexThreadListOptionsTests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+    target_link_libraries(CodexThreadListOptionsTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME CodexThreadListOptionsTests COMMAND CodexThreadListOptionsTests $<TARGET_FILE:FakeAppServer>)
+endif()
+
 if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/model/SessionRuntimeTests.cpp")
     add_executable(SessionRuntimeTests
         tests/model/SessionRuntimeTests.cpp
@@ -543,6 +715,7 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/sync/SessionSyncT
         src/storage/SessionMetadataRepository.cpp
         src/storage/SqliteDatabase.cpp
         src/sync/SessionSyncService.cpp
+        src/sync/ExternalSessionProbe.cpp
     )
     codex_deck_enable_cpp23(SessionSyncTests)
     codex_deck_enable_msvc_defaults(SessionSyncTests)

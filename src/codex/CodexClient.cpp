@@ -15,6 +15,9 @@ namespace {
 // Limite de page par defaut pour thread/list.
 constexpr int kThreadListLimit = 100;
 
+// Limite de page demandee pour model/list.
+constexpr int kModelListLimit = 100;
+
 // Nom de client transmis pendant initialize.
 constexpr char kClientName[] = "codex-deck";
 
@@ -134,9 +137,15 @@ void CompleteVoid(std::expected<nlohmann::json, CodexError> result, VoidCompleti
 // - objet params pour thread/list.
 // ----------------------------------------------------------------------------
 nlohmann::json ThreadListParams(const ThreadListOptions& options, const std::optional<std::string>& cursor) {
+    const std::size_t requested_limit = options.max_items
+        ? std::min<std::size_t>(*options.max_items, kThreadListLimit)
+        : kThreadListLimit;
     nlohmann::json params = {
-        {"limit", kThreadListLimit},
+        {"limit", requested_limit},
+        {"sortKey", options.sort_key},
+        {"sortDirection", options.sort_direction},
         {"archived", options.archived},
+        {"useStateDbOnly", options.use_state_db_only},
     };
     if (options.cwd) {
         params["cwd"] = options.cwd->string();
@@ -145,6 +154,32 @@ nlohmann::json ThreadListParams(const ThreadListOptions& options, const std::opt
         params["cursor"] = *cursor;
     }
     return params;
+}
+
+// ----------------------------------------------------------------------------
+// Parse un modele retourne par model/list.
+// ----------------------------------------------------------------------------
+std::optional<CodexModelInfo> ParseModelInfo(const nlohmann::json& payload) {
+    if (!payload.is_object()) {
+        return std::nullopt;
+    }
+    const auto id = payload.find("id");
+    if (id == payload.end() || !id->is_string() || id->get<std::string>().empty()) {
+        return std::nullopt;
+    }
+    CodexModelInfo model{};
+    model.id = id->get<std::string>();
+    model.display_name = payload.value("displayName", model.id);
+    model.is_default = payload.value("isDefault", false);
+    const auto efforts = payload.find("supportedEfforts");
+    if (efforts != payload.end() && efforts->is_array()) {
+        for (const nlohmann::json& effort : *efforts) {
+            if (effort.is_string()) {
+                model.supported_efforts.push_back(effort.get<std::string>());
+            }
+        }
+    }
+    return model;
 }
 
 }  // namespace
@@ -194,6 +229,9 @@ void CodexClient::ListThreads(ThreadListOptions options, ThreadListCompletion co
                 return;
             }
             for (const nlohmann::json& item : result->at("data")) {
+                if (state->options.max_items && state->threads.size() >= *state->options.max_items) {
+                    break;
+                }
                 auto parsed = ParseThreadSummary(item);
                 if (!parsed) {
                     state->completion(std::unexpected(parsed.error()));
@@ -202,11 +240,55 @@ void CodexClient::ListThreads(ThreadListOptions options, ThreadListCompletion co
                 state->threads.push_back(std::move(*parsed));
             }
 
+            if (state->options.max_items && state->threads.size() >= *state->options.max_items) {
+                state->completion(std::move(state->threads));
+                return;
+            }
+
             if (result->contains("nextCursor") && !result->at("nextCursor").is_null()) {
                 (*request_page)(result->at("nextCursor").get<std::string>());
                 return;
             }
             state->completion(std::move(state->threads));
+        });
+    };
+    (*request_page)(std::nullopt);
+}
+
+// ----------------------------------------------------------------------------
+// Liste exhaustivement les modeles proposes par app-server.
+// ----------------------------------------------------------------------------
+void CodexClient::ListModels(ModelListCompletion completion) {
+    struct ListState {
+        ModelListCompletion completion;
+        std::vector<CodexModelInfo> models;
+    };
+    auto state = std::make_shared<ListState>(ListState{std::move(completion), {}});
+    auto request_page = std::make_shared<std::move_only_function<void(std::optional<std::string>)>>();
+    *request_page = [this, state, request_page](std::optional<std::string> cursor) mutable {
+        nlohmann::json params = {{"limit", kModelListLimit}};
+        if (cursor) {
+            params["cursor"] = *cursor;
+        }
+        transport_.Request("model/list", std::move(params), [this, state, request_page](std::expected<nlohmann::json, CodexError> result) mutable {
+            if (!result) {
+                state->completion(std::unexpected(result.error()));
+                return;
+            }
+            if (!result->is_object() || !result->contains("data") || !result->at("data").is_array()) {
+                state->completion(std::unexpected(InvalidResponse(L"La liste de modeles est invalide")));
+                return;
+            }
+            for (const nlohmann::json& item : result->at("data")) {
+                if (auto model = ParseModelInfo(item)) {
+                    state->models.push_back(std::move(*model));
+                }
+            }
+            if (result->contains("nextCursor") && result->at("nextCursor").is_string()) {
+                (*request_page)(result->at("nextCursor").get<std::string>());
+                return;
+            }
+            state->completion(std::move(state->models));
         });
     };
     (*request_page)(std::nullopt);
@@ -288,6 +370,14 @@ void CodexClient::SetThreadName(CodexThreadId thread_id, std::string name, VoidC
 void CodexClient::ArchiveThread(CodexThreadId thread_id, VoidCompletion completion) {
     nlohmann::json params = {{"threadId", std::move(thread_id)}};
     transport_.Request("thread/archive", std::move(params), [completion = std::move(completion)](std::expected<nlohmann::json, CodexError> result) mutable {
+        CompleteVoid(std::move(result), std::move(completion));
+    });
+}
+
+// Restaure un thread archive cote Codex.
+void CodexClient::UnarchiveThread(CodexThreadId thread_id, VoidCompletion completion) {
+    nlohmann::json params = {{"threadId", std::move(thread_id)}};
+    transport_.Request("thread/unarchive", std::move(params), [completion = std::move(completion)](std::expected<nlohmann::json, CodexError> result) mutable {
         CompleteVoid(std::move(result), std::move(completion));
     });
 }
